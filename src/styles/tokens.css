@@ -1,0 +1,170 @@
+/*
+ * KILVORA GROUP — Design tokens (fundação W1, PROVISÓRIOS)
+ *
+ * Valores neutros de engenharia. NÃO representam a identidade visual aprovada.
+ * Quando a identidade for aprovada, alterar apenas os valores primitivos e o
+ * mapeamento semântico deste ficheiro; os componentes usam só nomes semânticos.
+ *
+ * Tema: segue o sistema por omissão; pode ser forçado com
+ * <html data-theme="light"> ou <html data-theme="dark">.
+ */
+
+/* ---------- Tema claro (por omissão) ---------- */
+:root {
+  color-scheme: light;
+
+  /* Superfícies e texto */
+  --ds-background: oklch(1 0 0);
+  --ds-foreground: oklch(0.21 0.006 265);
+  --ds-surface: oklch(0.975 0.002 265);
+  --ds-surface-foreground: oklch(0.21 0.006 265);
+  --ds-muted: oklch(0.955 0.003 265);
+  --ds-muted-foreground: oklch(0.47 0.012 265);
+  --ds-border: oklch(0.9 0.004 265);
+  --ds-input: oklch(0.86 0.005 265);
+
+  /* Acção principal (neutro provisório até aprovação da marca) */
+  --ds-primary: oklch(0.3 0.03 260);
+  --ds-primary-foreground: oklch(0.985 0 0);
+  --ds-secondary: oklch(0.94 0.005 265);
+  --ds-secondary-foreground: oklch(0.25 0.01 265);
+
+  /* Estados de feedback */
+  --ds-success: oklch(0.52 0.13 150);
+  --ds-success-foreground: oklch(0.985 0 0);
+  --ds-warning: oklch(0.68 0.15 75);
+  --ds-warning-foreground: oklch(0.2 0.03 75);
+  --ds-danger: oklch(0.55 0.2 27);
+  --ds-danger-foreground: oklch(0.985 0 0);
+  --ds-info: oklch(0.52 0.13 245);
+  --ds-info-foreground: oklch(0.985 0 0);
+
+  /* Foco (acessibilidade: sempre visível, contraste ≥ 3:1) */
+  --ds-ring: oklch(0.55 0.17 255);
+  --ds-ring-width: 2px;
+  --ds-ring-offset: 2px;
+}
+
+/* ---------- Tema escuro ---------- */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+
+    --ds-background: oklch(0.16 0.004 265);
+    --ds-foreground: oklch(0.96 0.003 265);
+    --ds-surface: oklch(0.2 0.005 265);
+    --ds-surface-foreground: oklch(0.96 0.003 265);
+    --ds-muted: oklch(0.24 0.006 265);
+    --ds-muted-foreground: oklch(0.72 0.01 265);
+    --ds-border: oklch(0.3 0.007 265);
+    --ds-input: oklch(0.36 0.008 265);
+
+    --ds-primary: oklch(0.9 0.015 260);
+    --ds-primary-foreground: oklch(0.2 0.02 260);
+    --ds-secondary: oklch(0.27 0.007 265);
+    --ds-secondary-foreground: oklch(0.94 0.004 265);
+
+    --ds-success: oklch(0.7 0.14 150);
+    --ds-success-foreground: oklch(0.18 0.03 150);
+    --ds-warning: oklch(0.8 0.14 80);
+    --ds-warning-foreground: oklch(0.2 0.03 75);
+    --ds-danger: oklch(0.68 0.18 25);
+    --ds-danger-foreground: oklch(0.18 0.03 25);
+    --ds-info: oklch(0.72 0.12 245);
+    --ds-info-foreground: oklch(0.18 0.03 245);
+
+    --ds-ring: oklch(0.72 0.14 255);
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --ds-background: oklch(0.16 0.004 265);
+  --ds-foreground: oklch(0.96 0.003 265);
+  --ds-surface: oklch(0.2 0.005 265);
+  --ds-surface-foreground: oklch(0.96 0.003 265);
+  --ds-muted: oklch(0.24 0.006 265);
+  --ds-muted-foreground: oklch(0.72 0.01 265);
+  --ds-border: oklch(0.3 0.007 265);
+  --ds-input: oklch(0.36 0.008 265);
+
+  --ds-primary: oklch(0.9 0.015 260);
+  --ds-primary-foreground: oklch(0.2 0.02 260);
+  --ds-secondary: oklch(0.27 0.007 265);
+  --ds-secondary-foreground: oklch(0.94 0.004 265);
+
+  --ds-success: oklch(0.7 0.14 150);
+  --ds-success-foreground: oklch(0.18 0.03 150);
+  --ds-warning: oklch(0.8 0.14 80);
+  --ds-warning-foreground: oklch(0.2 0.03 75);
+  --ds-danger: oklch(0.68 0.18 25);
+  --ds-danger-foreground: oklch(0.18 0.03 25);
+  --ds-info: oklch(0.72 0.12 245);
+  --ds-info-foreground: oklch(0.18 0.03 245);
+
+  --ds-ring: oklch(0.72 0.14 255);
+}
+
+/*
+ * ---------- Ponte para Tailwind CSS v4 ----------
+ * Gera utilitários semânticos: bg-background, text-foreground, bg-primary,
+ * text-muted-foreground, border-border, ring-ring, rounded-md, p-gutter,
+ * py-section, font-sans, text-display, etc.
+ * `inline` faz os utilitários lerem a variável em tempo de execução, para que
+ * a troca de tema não exija recompilação.
+ */
+@theme inline {
+  /* Cores */
+  --color-background: var(--ds-background);
+  --color-foreground: var(--ds-foreground);
+  --color-surface: var(--ds-surface);
+  --color-surface-foreground: var(--ds-surface-foreground);
+  --color-muted: var(--ds-muted);
+  --color-muted-foreground: var(--ds-muted-foreground);
+  --color-border: var(--ds-border);
+  --color-input: var(--ds-input);
+  --color-primary: var(--ds-primary);
+  --color-primary-foreground: var(--ds-primary-foreground);
+  --color-secondary: var(--ds-secondary);
+  --color-secondary-foreground: var(--ds-secondary-foreground);
+  --color-success: var(--ds-success);
+  --color-success-foreground: var(--ds-success-foreground);
+  --color-warning: var(--ds-warning);
+  --color-warning-foreground: var(--ds-warning-foreground);
+  --color-danger: var(--ds-danger);
+  --color-danger-foreground: var(--ds-danger-foreground);
+  --color-info: var(--ds-info);
+  --color-info-foreground: var(--ds-info-foreground);
+  --color-ring: var(--ds-ring);
+
+  /* Tipografia (fonte provisória; substituir quando a identidade for aprovada) */
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+}
+
+@theme {
+  /* Escala tipográfica semântica (complementa a escala padrão do Tailwind) */
+  --text-display: clamp(2rem, 1.4rem + 3vw, 3.5rem);
+  --text-display--line-height: 1.1;
+  --text-display--letter-spacing: -0.02em;
+  --text-heading: clamp(1.5rem, 1.2rem + 1.5vw, 2.25rem);
+  --text-heading--line-height: 1.2;
+  --text-body: 1rem;
+  --text-body--line-height: 1.6;
+  --text-caption: 0.8125rem;
+  --text-caption--line-height: 1.4;
+
+  /* Espaçamento semântico (a escala base do Tailwind mantém-se em 0.25rem) */
+  --spacing-gutter: clamp(1rem, 0.5rem + 2.5vw, 2rem);
+  --spacing-section: clamp(3rem, 2rem + 5vw, 6rem);
+  --container-content: 72rem;
+  --container-prose: 42rem;
+
+  /* Raios */
+  --radius-sm: 0.25rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+  --radius-full: 9999px;
+}

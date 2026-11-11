@@ -1,0 +1,64 @@
+# --- Documentação interna (nunca versionar) ---
+/Docs/
+/docs-internal/
+
+# --- Dependências ---
+/node_modules
+/.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+
+# --- Testes ---
+/coverage
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+
+# --- Next.js / build ---
+/.next/
+/out/
+/build
+*.tsbuildinfo
+next-env.d.ts
+
+# --- Variáveis de ambiente e segredos ---
+# Apenas .env.example (sem credenciais) é versionado.
+.env*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+
+# --- Supabase local ---
+/supabase/.branches/
+/supabase/.temp/
+
+# --- Vercel ---
+.vercel
+
+# --- Logs ---
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+*.log
+
+# --- Ficheiros temporários / SO / editor ---
+.DS_Store
+Thumbs.db
+desktop.ini
+*.tmp
+*.temp
+*.swp
+*~
+/tmp/
+/.cache/
+.vscode/*
+!.vscode/extensions.json
+.idea/
