@@ -12,7 +12,11 @@ Este repositório é exclusivo do website institucional. Não confundir com Kilv
 - Vitest (unitários, `src/**/*.test.ts(x)`); Playwright reservado em `e2e/` (não instalado)
 - Supabase reservado em `src/lib/supabase/` (não integrado)
 - i18n: `src/i18n/config.ts` — activos pt-BR e pt-AO; en/es preparados e desactivados
-- Design system: tokens em `src/styles/tokens.css` (provisórios); decisões em `documentacao/engenharia/design-system.md`
+- Design system: tokens em `src/styles/tokens.css` (identidade provisória); decisões em `documentacao/engenharia/design-system.md`
+- Configuração: `src/config/` (`site.ts`, `navigation.ts` — fonte única do menu/rodapé/sitemap, `contacts.ts` — fonte única de contactos)
+- Conteúdo: `src/content/` — tipado, com `status: aprovado | provisorio` e variantes pt-AO/pt-BR (`v(ao, br)`); provisório é sempre assinalado «Em validação»
+- Componentes: `src/components/`; modelos de página em `src/app/**/_components/`
+- Next 16 com `cacheComponents`: não usar `dynamicParams`; menus fecham ao ocultar a rota (Activity). Se o CSS parecer desactualizado, apagar `.next` e reconstruir
 - CI: `.github/workflows/ci.yml` (`npm ci` + `npm run verify`, Node 24, `contents: read`, telemetria desactivada)
 
 Documentação de engenharia versionada vai em `documentacao/` — nunca em `docs/` (no Windows coincide com `Docs/`, que é protegida e ignorada).
@@ -58,5 +62,7 @@ Utilizar `npm.cmd` / `npx.cmd` no PowerShell.
 
 ## Estado dos portões
 
-- W1 — Fundação (incl. W1-F: CI, design system mínimo, telemetria): executado localmente (sem commit). Aguarda aprovação.
-- W2–W5: não iniciados.
+- W1 — Fundação: concluído e publicado (`main`, protegida por ruleset; alterações só por branch + PR).
+- W2-A — Análise de identidade e conteúdos: concluída.
+- W2-B — Interface institucional: implementada localmente na branch `feat/w2-b-institutional-ui` (sem commit). Aguarda auditoria.
+- W3–W5: não iniciados. Rotas `/cliente/*` reservadas para W3.

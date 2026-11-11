@@ -13,10 +13,22 @@
     line-height: var(--text-body--line-height);
   }
 
-  /* Foco visível consistente em todos os elementos interactivos */
+  /* Foco visível consistente em todos os elementos interactivos.
+     Usa --ds-ring directamente para herdar a sobreposição de [data-tone="inverse"]. */
   :focus-visible {
-    outline: var(--ds-ring-width) solid var(--color-ring);
+    outline: var(--ds-ring-width) solid var(--ds-ring);
     outline-offset: var(--ds-ring-offset);
+  }
+
+  /* Âncoras não ficam escondidas sob o cabeçalho e a navegação contextual */
+  [id] {
+    scroll-margin-top: var(--spacing-anchor);
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    html {
+      scroll-behavior: smooth;
+    }
   }
 
   @media (prefers-reduced-motion: reduce) {
