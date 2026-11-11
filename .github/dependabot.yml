@@ -1,0 +1,21 @@
+# Dependabot — actualizações por pull request (nunca directamente na main).
+# Cada PR passa pelo CI e pelas regras de protecção da main antes de merge manual.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    target-branch: main
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: chore(deps)
+
+  - package-ecosystem: github-actions
+    directory: /
+    target-branch: main
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: chore(deps)
