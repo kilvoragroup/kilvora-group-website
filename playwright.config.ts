@@ -1,5 +1,7 @@
 import { defineConfig, devices } from "@playwright/test";
 
+import { e2eVercelEnv } from "./e2e/helpers";
+
 const PORT = 3100;
 const baseURL = `http://localhost:${PORT}`;
 
@@ -26,7 +28,13 @@ export default defineConfig({
     command: `npm run build && npx next start --port ${PORT}`,
     url: baseURL,
     timeout: 300_000,
-    reuseExistingServer: !process.env.CI,
-    env: { NEXT_TELEMETRY_DISABLED: "1" },
+    // Nunca reutilizar um servidor já em execução: poderia ter sido construído para
+    // outro ambiente e mascarar o comportamento SEO real.
+    reuseExistingServer: false,
+    env: {
+      NEXT_TELEMETRY_DISABLED: "1",
+      // Ambiente definido explicitamente (não herdado do terminal). "none" = ausente.
+      VERCEL_ENV: e2eVercelEnv === "none" ? "" : e2eVercelEnv,
+    },
   },
 });

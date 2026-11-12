@@ -5,6 +5,7 @@ import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 import { SkipLink } from "@/components/skip-link";
 import { WhatsAppButton } from "@/components/whatsapp-button";
+import { robotsMetadata } from "@/config/seo";
 import { site } from "@/config/site";
 import { getContent } from "@/content";
 
@@ -28,10 +29,8 @@ export const metadata: Metadata = {
   title: { default: `${site.name} — ${site.signature}`, template: `%s | ${site.name}` },
   description: pages.home.description,
   applicationName: site.name,
-  // Indexação bloqueada até à autorização de publicação (W5).
-  robots: site.indexable
-    ? { index: true, follow: true }
-    : { index: false, follow: false, nocache: true, googleBot: { index: false, follow: false } },
+  // Indexável apenas em Production (ver src/config/seo.ts e src/app/robots.ts).
+  robots: robotsMetadata(site.indexable),
   openGraph: {
     type: "website",
     siteName: site.name,

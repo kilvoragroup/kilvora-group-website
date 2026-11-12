@@ -1,14 +1,9 @@
 import type { MetadataRoute } from "next";
 
+import { robotsRules } from "@/config/seo";
 import { site } from "@/config/site";
 
-/** Indexação bloqueada até à autorização de publicação (W5). */
+/** Production: `Allow: /` + `Disallow: /cliente/`. Restantes ambientes: `Disallow: /`. */
 export default function robots(): MetadataRoute.Robots {
-  if (!site.indexable) {
-    return { rules: { userAgent: "*", disallow: "/" } };
-  }
-  return {
-    rules: { userAgent: "*", allow: "/", disallow: "/cliente/" },
-    sitemap: `${site.url}/sitemap.xml`,
-  };
+  return robotsRules(site.indexable, site.url);
 }

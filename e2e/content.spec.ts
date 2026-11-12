@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-import { publicPages, viewports } from "./helpers";
+import { e2eIndexable, e2eVercelEnv, publicPages, viewports } from "./helpers";
 
 test.use({ viewport: viewports.desktop });
 
@@ -43,19 +43,36 @@ test.describe("planos comerciais (Angola)", () => {
 });
 
 test.describe("segurança e publicação", () => {
-  test("todas as páginas têm noindex, nofollow e robots.txt bloqueia tudo", async ({
+  test(`SEO por ambiente (VERCEL_ENV=${e2eVercelEnv}): meta robots, robots.txt e sitemap`, async ({
     page,
     request,
   }) => {
     for (const path of publicPages) {
       await page.goto(path);
-      await expect(page.locator('meta[name="robots"]')).toHaveAttribute(
-        "content",
-        /noindex, nofollow/,
-      );
+      const robotsMeta = page.locator('meta[name="robots"]');
+      if (e2eIndexable) {
+        await expect(robotsMeta, path).toHaveAttribute("content", /^index, follow/);
+        await expect(robotsMeta, path).not.toHaveAttribute("content", /noindex|nofollow/);
+      } else {
+        await expect(robotsMeta, path).toHaveAttribute("content", /noindex, nofollow/);
+      }
     }
+
     const robots = await (await request.get("/robots.txt")).text();
-    expect(robots).toMatch(/Disallow: \/\s*$/m);
+    if (e2eIndexable) {
+      expect(robots).toMatch(/^Allow: \/\s*$/m);
+      expect(robots).toMatch(/^Disallow: \/cliente\/\s*$/m);
+      expect(robots).not.toMatch(/^Disallow: \/\s*$/m); // sem bloqueio global
+      expect(robots).toMatch(/^Sitemap: .+\/sitemap\.xml\s*$/m);
+    } else {
+      expect(robots).toMatch(/^Disallow: \/\s*$/m); // bloqueio global
+      expect(robots).not.toMatch(/^Allow: \//m);
+      expect(robots).not.toMatch(/^Sitemap:/m);
+    }
+
+    const sitemap = await (await request.get("/sitemap.xml")).text();
+    expect(sitemap).toContain("<loc>");
+    expect(sitemap).not.toContain("/cliente");
   });
 
   test("WhatsApp não é publicado enquanto não aprovado", async ({ page }) => {
