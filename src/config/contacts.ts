@@ -5,8 +5,9 @@
  * Nunca acrescentar contactos sem confirmação documental do proprietário.
  *
  * - Email: aprovado em materiais comerciais anteriores (Plano Director §8).
- * - WhatsApp: número indicado na proposta comercial, mas o Plano Director §8 exige
- *   confirmar titularidade e formatação → provisório (não publicado).
+ * - WhatsApp: ainda não aprovado como contacto oficial (Plano Director §8 exige confirmar
+ *   titularidade e formatação). O número não é guardado no repositório até à confirmação.
+ *   Para activar: preencher `value` com o número confirmado e mudar `status` para "aprovado".
  * - Morada: não confirmada para publicação → não incluída.
  */
 import type { ContentStatus } from "@/content/types";
@@ -24,9 +25,9 @@ export const contacts = {
     source: "Plano Director v1.0 §8; Proposta comercial (p. 17)",
   },
   whatsapp: {
-    value: "+55 47 98457-5883",
+    value: "",
     status: "provisorio",
-    source: "Proposta comercial (p. 17); titularidade por confirmar (Plano Director §8)",
+    source: "Por confirmar pelo proprietário (Plano Director §8)",
   },
 } as const satisfies Record<string, Contact>;
 
@@ -45,9 +46,10 @@ export function whatsappHref(phone: string): string {
   return `https://wa.me/${phone.replace(/\D/g, "")}`;
 }
 
-/** WhatsApp publicável, ou `null` enquanto o número não estiver confirmado. */
-export function publicWhatsapp(): { label: string; href: string } | null {
-  const contact: Contact = contacts.whatsapp;
-  if (!isPublic(contact)) return null;
+/** WhatsApp publicável, ou `null` enquanto o número não estiver confirmado e preenchido. */
+export function publicWhatsapp(
+  contact: Contact = contacts.whatsapp,
+): { label: string; href: string } | null {
+  if (!isPublic(contact) || contact.value.trim() === "") return null;
   return { label: contact.value, href: whatsappHref(contact.value) };
 }

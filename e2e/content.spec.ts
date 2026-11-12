@@ -62,7 +62,8 @@ test.describe("segurança e publicação", () => {
     for (const path of ["/", "/contactos", "/websites"]) {
       await page.goto(path);
       await expect(page.locator('a[href*="wa.me"]')).toHaveCount(0);
-      await expect(page.locator("body")).not.toContainText("98457");
+      await expect(page.locator('[aria-label^="WhatsApp"]')).toHaveCount(0);
+      await expect(page.locator("body")).not.toContainText(/\+\d{2,3}[\s\d-]{8,}/);
     }
   });
 
