@@ -1,5 +1,21 @@
 import type { Page } from "@playwright/test";
 
+/**
+ * Ambiente Vercel simulado no build do servidor E2E (ver playwright.config.ts).
+ * Por omissão `production`; usar `E2E_VERCEL_ENV=preview|development|none` para os
+ * restantes cenários (`none` = variável ausente). Valores desconhecidos são rejeitados.
+ */
+const allowedEnvs = ["production", "preview", "development", "none"] as const;
+export type E2EVercelEnv = (typeof allowedEnvs)[number];
+
+export const e2eVercelEnv = (process.env.E2E_VERCEL_ENV ?? "production") as E2EVercelEnv;
+if (!allowedEnvs.includes(e2eVercelEnv)) {
+  throw new Error(`E2E_VERCEL_ENV inválido: "${e2eVercelEnv}" (usar ${allowedEnvs.join(", ")})`);
+}
+
+/** Só Production é indexável. */
+export const e2eIndexable = e2eVercelEnv === "production";
+
 export const viewports = {
   mobile: { width: 375, height: 812 },
   tablet: { width: 768, height: 1024 },

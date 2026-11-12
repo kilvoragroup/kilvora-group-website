@@ -1,6 +1,8 @@
 import { defaultLocale } from "@/i18n/config";
 import type { PtLocale } from "@/content/types";
 
+import { isIndexableEnv } from "./seo";
+
 /**
  * Configuração institucional do site.
  *
@@ -17,8 +19,8 @@ export const site = {
   /** Variante de português apresentada. Ambas (pt-AO, pt-BR) existem no conteúdo. */
   locale: defaultLocale as PtLocale,
   url: (process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000").replace(/\/$/, ""),
-  /** Indexação bloqueada até à autorização de publicação (W5). */
-  indexable: false,
+  /** Indexável apenas em Production (`VERCEL_ENV=production`); bloqueado nos restantes ambientes. */
+  indexable: isIndexableEnv(process.env.VERCEL_ENV),
   brand: {
     logo: { kind: "wordmark", status: "provisorio" },
     typography: { family: "Geist", status: "provisorio" },
