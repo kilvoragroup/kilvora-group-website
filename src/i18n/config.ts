@@ -13,7 +13,8 @@ export const locales = [
 
 export type Locale = (typeof locales)[number]["code"];
 
-export const defaultLocale: Locale = "pt-BR";
+/** Idioma inicial apresentado (W2-C: pt-AO). pt-BR mantém-se disponível no conteúdo. */
+export const defaultLocale: Locale = "pt-AO";
 
 export function getEnabledLocales(): Locale[] {
   return locales.filter((l) => l.enabled).map((l) => l.code);

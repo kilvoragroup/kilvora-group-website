@@ -1,12 +1,17 @@
 /*
- * KILVORA GROUP — Design tokens (fundação W1, PROVISÓRIOS)
+ * KILVORA GROUP — Design tokens
  *
- * Valores neutros de engenharia. NÃO representam a identidade visual aprovada.
- * Quando a identidade for aprovada, alterar apenas os valores primitivos e o
- * mapeamento semântico deste ficheiro; os componentes usam só nomes semânticos.
+ * Identidade institucional PROVISÓRIA (W2-B), baseada na paleta proposta no
+ * dossiê institucional e no Plano Director: navy #0B1F3A (dominante),
+ * verde #16A34A (acento), laranja #F28C28 (chamadas à acção) e açafrão #E5A823
+ * (apenas quando necessário). A paleta final depende do manual de marca.
  *
- * Tema: segue o sistema por omissão; pode ser forçado com
- * <html data-theme="light"> ou <html data-theme="dark">.
+ * Regras de contraste (WCAG AA, validadas em src/styles/tokens.test.ts):
+ * - Laranja (`accent`) usa sempre texto navy (`accent-foreground`).
+ * - Verde de marca (`highlight`) só em elementos gráficos ou com texto navy.
+ * - Superfícies navy (`inverse`) usam anel de foco laranja (data-tone="inverse").
+ *
+ * Tema: segue o sistema; pode ser forçado com <html data-theme="light|dark">.
  */
 
 /* ---------- Tema claro (por omissão) ---------- */
@@ -14,33 +19,42 @@
   color-scheme: light;
 
   /* Superfícies e texto */
-  --ds-background: oklch(1 0 0);
-  --ds-foreground: oklch(0.21 0.006 265);
-  --ds-surface: oklch(0.975 0.002 265);
-  --ds-surface-foreground: oklch(0.21 0.006 265);
-  --ds-muted: oklch(0.955 0.003 265);
-  --ds-muted-foreground: oklch(0.47 0.012 265);
-  --ds-border: oklch(0.9 0.004 265);
-  --ds-input: oklch(0.86 0.005 265);
+  --ds-background: #ffffff;
+  --ds-foreground: #0b1f3a;
+  --ds-surface: #f8fafc;
+  --ds-surface-foreground: #0b1f3a;
+  --ds-muted: #eef2f7;
+  --ds-muted-foreground: #475569;
+  --ds-border: #dce3ec;
+  --ds-input: #64748b;
 
-  /* Acção principal (neutro provisório até aprovação da marca) */
-  --ds-primary: oklch(0.3 0.03 260);
-  --ds-primary-foreground: oklch(0.985 0 0);
-  --ds-secondary: oklch(0.94 0.005 265);
-  --ds-secondary-foreground: oklch(0.25 0.01 265);
+  /* Marca */
+  --ds-primary: #0b1f3a;
+  --ds-primary-foreground: #ffffff;
+  --ds-secondary: #e6ecf4;
+  --ds-secondary-foreground: #0b1f3a;
+  --ds-accent: #f28c28;
+  --ds-accent-foreground: #0b1f3a;
+  --ds-highlight: #16a34a;
+  --ds-highlight-foreground: #0b1f3a;
+
+  /* Superfície institucional navy (hero, faixas de destaque) */
+  --ds-inverse: #0b1f3a;
+  --ds-inverse-foreground: #ffffff;
+  --ds-inverse-muted: #c3cedd;
 
   /* Estados de feedback */
-  --ds-success: oklch(0.52 0.13 150);
-  --ds-success-foreground: oklch(0.985 0 0);
-  --ds-warning: oklch(0.68 0.15 75);
-  --ds-warning-foreground: oklch(0.2 0.03 75);
-  --ds-danger: oklch(0.55 0.2 27);
-  --ds-danger-foreground: oklch(0.985 0 0);
-  --ds-info: oklch(0.52 0.13 245);
-  --ds-info-foreground: oklch(0.985 0 0);
+  --ds-success: #15803d;
+  --ds-success-foreground: #ffffff;
+  --ds-warning: #e5a823;
+  --ds-warning-foreground: #0b1f3a;
+  --ds-danger: #b91c1c;
+  --ds-danger-foreground: #ffffff;
+  --ds-info: #1d4ed8;
+  --ds-info-foreground: #ffffff;
 
-  /* Foco (acessibilidade: sempre visível, contraste ≥ 3:1) */
-  --ds-ring: oklch(0.55 0.17 255);
+  /* Foco (sempre visível, contraste ≥ 3:1) */
+  --ds-ring: #1d4ed8;
   --ds-ring-width: 2px;
   --ds-ring-offset: 2px;
 }
@@ -50,69 +64,88 @@
   :root:not([data-theme="light"]) {
     color-scheme: dark;
 
-    --ds-background: oklch(0.16 0.004 265);
-    --ds-foreground: oklch(0.96 0.003 265);
-    --ds-surface: oklch(0.2 0.005 265);
-    --ds-surface-foreground: oklch(0.96 0.003 265);
-    --ds-muted: oklch(0.24 0.006 265);
-    --ds-muted-foreground: oklch(0.72 0.01 265);
-    --ds-border: oklch(0.3 0.007 265);
-    --ds-input: oklch(0.36 0.008 265);
+    --ds-background: #071426;
+    --ds-foreground: #f1f5f9;
+    --ds-surface: #0b1f3a;
+    --ds-surface-foreground: #f1f5f9;
+    --ds-muted: #12294a;
+    --ds-muted-foreground: #aab7c8;
+    --ds-border: #1f3a5f;
+    --ds-input: #6b819e;
 
-    --ds-primary: oklch(0.9 0.015 260);
-    --ds-primary-foreground: oklch(0.2 0.02 260);
-    --ds-secondary: oklch(0.27 0.007 265);
-    --ds-secondary-foreground: oklch(0.94 0.004 265);
+    --ds-primary: #f1f5f9;
+    --ds-primary-foreground: #0b1f3a;
+    --ds-secondary: #16305a;
+    --ds-secondary-foreground: #f1f5f9;
+    --ds-accent: #f28c28;
+    --ds-accent-foreground: #0b1f3a;
+    --ds-highlight: #22c55e;
+    --ds-highlight-foreground: #071426;
 
-    --ds-success: oklch(0.7 0.14 150);
-    --ds-success-foreground: oklch(0.18 0.03 150);
-    --ds-warning: oklch(0.8 0.14 80);
-    --ds-warning-foreground: oklch(0.2 0.03 75);
-    --ds-danger: oklch(0.68 0.18 25);
-    --ds-danger-foreground: oklch(0.18 0.03 25);
-    --ds-info: oklch(0.72 0.12 245);
-    --ds-info-foreground: oklch(0.18 0.03 245);
+    --ds-inverse: #0b1f3a;
+    --ds-inverse-foreground: #f1f5f9;
+    --ds-inverse-muted: #c3cedd;
 
-    --ds-ring: oklch(0.72 0.14 255);
+    --ds-success: #22c55e;
+    --ds-success-foreground: #071426;
+    --ds-warning: #e5a823;
+    --ds-warning-foreground: #071426;
+    --ds-danger: #f87171;
+    --ds-danger-foreground: #071426;
+    --ds-info: #60a5fa;
+    --ds-info-foreground: #071426;
+
+    --ds-ring: #f28c28;
   }
 }
 
 :root[data-theme="dark"] {
   color-scheme: dark;
 
-  --ds-background: oklch(0.16 0.004 265);
-  --ds-foreground: oklch(0.96 0.003 265);
-  --ds-surface: oklch(0.2 0.005 265);
-  --ds-surface-foreground: oklch(0.96 0.003 265);
-  --ds-muted: oklch(0.24 0.006 265);
-  --ds-muted-foreground: oklch(0.72 0.01 265);
-  --ds-border: oklch(0.3 0.007 265);
-  --ds-input: oklch(0.36 0.008 265);
+  --ds-background: #071426;
+  --ds-foreground: #f1f5f9;
+  --ds-surface: #0b1f3a;
+  --ds-surface-foreground: #f1f5f9;
+  --ds-muted: #12294a;
+  --ds-muted-foreground: #aab7c8;
+  --ds-border: #1f3a5f;
+  --ds-input: #6b819e;
 
-  --ds-primary: oklch(0.9 0.015 260);
-  --ds-primary-foreground: oklch(0.2 0.02 260);
-  --ds-secondary: oklch(0.27 0.007 265);
-  --ds-secondary-foreground: oklch(0.94 0.004 265);
+  --ds-primary: #f1f5f9;
+  --ds-primary-foreground: #0b1f3a;
+  --ds-secondary: #16305a;
+  --ds-secondary-foreground: #f1f5f9;
+  --ds-accent: #f28c28;
+  --ds-accent-foreground: #0b1f3a;
+  --ds-highlight: #22c55e;
+  --ds-highlight-foreground: #071426;
 
-  --ds-success: oklch(0.7 0.14 150);
-  --ds-success-foreground: oklch(0.18 0.03 150);
-  --ds-warning: oklch(0.8 0.14 80);
-  --ds-warning-foreground: oklch(0.2 0.03 75);
-  --ds-danger: oklch(0.68 0.18 25);
-  --ds-danger-foreground: oklch(0.18 0.03 25);
-  --ds-info: oklch(0.72 0.12 245);
-  --ds-info-foreground: oklch(0.18 0.03 245);
+  --ds-inverse: #0b1f3a;
+  --ds-inverse-foreground: #f1f5f9;
+  --ds-inverse-muted: #c3cedd;
 
-  --ds-ring: oklch(0.72 0.14 255);
+  --ds-success: #22c55e;
+  --ds-success-foreground: #071426;
+  --ds-warning: #e5a823;
+  --ds-warning-foreground: #071426;
+  --ds-danger: #f87171;
+  --ds-danger-foreground: #071426;
+  --ds-info: #60a5fa;
+  --ds-info-foreground: #071426;
+
+  --ds-ring: #f28c28;
+}
+
+/* Anel de foco em superfícies navy, em ambos os temas */
+[data-tone="inverse"] {
+  --ds-ring: #f28c28;
 }
 
 /*
  * ---------- Ponte para Tailwind CSS v4 ----------
- * Gera utilitários semânticos: bg-background, text-foreground, bg-primary,
- * text-muted-foreground, border-border, ring-ring, rounded-md, p-gutter,
- * py-section, font-sans, text-display, etc.
- * `inline` faz os utilitários lerem a variável em tempo de execução, para que
- * a troca de tema não exija recompilação.
+ * Utilitários semânticos: bg-background, text-foreground, bg-primary,
+ * bg-accent, text-accent-foreground, bg-inverse, border-border, ring-ring…
+ * `inline` faz os utilitários lerem a variável em tempo de execução.
  */
 @theme inline {
   /* Cores */
@@ -128,6 +161,13 @@
   --color-primary-foreground: var(--ds-primary-foreground);
   --color-secondary: var(--ds-secondary);
   --color-secondary-foreground: var(--ds-secondary-foreground);
+  --color-accent: var(--ds-accent);
+  --color-accent-foreground: var(--ds-accent-foreground);
+  --color-highlight: var(--ds-highlight);
+  --color-highlight-foreground: var(--ds-highlight-foreground);
+  --color-inverse: var(--ds-inverse);
+  --color-inverse-foreground: var(--ds-inverse-foreground);
+  --color-inverse-muted: var(--ds-inverse-muted);
   --color-success: var(--ds-success);
   --color-success-foreground: var(--ds-success-foreground);
   --color-warning: var(--ds-warning);
@@ -138,27 +178,39 @@
   --color-info-foreground: var(--ds-info-foreground);
   --color-ring: var(--ds-ring);
 
-  /* Tipografia (fonte provisória; substituir quando a identidade for aprovada) */
+  /* Tipografia (Geist provisória até aprovação da tipografia oficial) */
   --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, monospace;
 }
 
 @theme {
-  /* Escala tipográfica semântica (complementa a escala padrão do Tailwind) */
-  --text-display: clamp(2rem, 1.4rem + 3vw, 3.5rem);
-  --text-display--line-height: 1.1;
-  --text-display--letter-spacing: -0.02em;
-  --text-heading: clamp(1.5rem, 1.2rem + 1.5vw, 2.25rem);
-  --text-heading--line-height: 1.2;
+  /* Escala tipográfica semântica */
+  --text-display: clamp(2.25rem, 1.5rem + 3.5vw, 4rem);
+  --text-display--line-height: 1.05;
+  --text-display--letter-spacing: -0.025em;
+  --text-heading: clamp(1.625rem, 1.25rem + 1.6vw, 2.5rem);
+  --text-heading--line-height: 1.15;
+  --text-heading--letter-spacing: -0.015em;
+  --text-title: 1.25rem;
+  --text-title--line-height: 1.35;
   --text-body: 1rem;
   --text-body--line-height: 1.6;
+  --text-lead: clamp(1.0625rem, 1rem + 0.4vw, 1.25rem);
+  --text-lead--line-height: 1.55;
   --text-caption: 0.8125rem;
   --text-caption--line-height: 1.4;
+  --text-micro: 0.625rem;
+  --text-micro--line-height: 1;
 
-  /* Espaçamento semântico (a escala base do Tailwind mantém-se em 0.25rem) */
+  /* Espaçamento entre letras da marca nominativa provisória */
+  --tracking-brand: 0.18em;
+  --tracking-brand-wide: 0.42em;
+
+  /* Espaçamento semântico */
   --spacing-gutter: clamp(1rem, 0.5rem + 2.5vw, 2rem);
-  --spacing-section: clamp(3rem, 2rem + 5vw, 6rem);
-  --container-content: 72rem;
+  --spacing-section: clamp(3.5rem, 2rem + 5vw, 6.5rem);
+  --spacing-anchor: 8.5rem;
+  --container-content: 76rem;
   --container-prose: 42rem;
 
   /* Raios */
