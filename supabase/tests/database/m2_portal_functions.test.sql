@@ -161,14 +161,23 @@ select results_eq($$
 $$, $$ values ('admin'::text, 3), ('cliente'::text, 5), ('staff'::text, 16) $$,
   'C15: matriz de transições com 24 linhas (3 admin, 5 cliente, 16 staff)');
 
-select is(
-  (select md5(string_agg(
-     pg_get_userbyid(d.defaclrole) || '|' || coalesce(n.nspname::text, '') || '|'
-       || d.defaclobjtype::text || '|' || d.defaclacl::text,
-     E'\n' order by pg_get_userbyid(d.defaclrole), n.nspname, d.defaclobjtype))
-   from pg_default_acl d left join pg_namespace n on n.oid = d.defaclnamespace),
-  'f8d1f848d87de7e8306fca864898853f',
-  'C16/D-ACL: pg_default_acl inalterado pela M2');
+-- C16/D-ACL portátil: xmin (complementar; não detecta linhas apagadas nem
+-- subtransacções), premissa do xmin partilhado e conteúdo. A garantia integral é a
+-- comparação antes/depois com canários no CI (job db-tests).
+select is_empty($$
+  select 'xmin:' || d.oid::text from pg_default_acl d
+  where d.xmin::text in (select m.xmin::text from supabase_migrations.schema_migrations m)
+  union all
+  select 'premissa:' || m.version from supabase_migrations.schema_migrations m
+  where not exists (select 1 from pg_class c where c.xmin = m.xmin)
+    and not exists (select 1 from pg_proc p where p.xmin = m.xmin)
+    and not exists (select 1 from pg_namespace n where n.xmin = m.xmin)
+    and not exists (select 1 from pg_type t where t.xmin = m.xmin)
+  union all
+  select 'acl:' || d.oid::text from pg_default_acl d
+  where exists (select 1 from aclexplode(d.defaclacl) a
+                where a.grantee in (select oid from pg_roles where rolname like 'portal\_%'))
+$$, 'C16/D-ACL: M1/M2 não criam nem alteram privilégios por omissão, nem os concedem a papéis do portal');
 
 select is_empty($$
   select schemaname || '.' || tablename || ':' || policyname from pg_policies

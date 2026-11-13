@@ -293,23 +293,35 @@ select is_empty($$
 $$, 'R-ROLE3: papéis dedicados não são donos de tabelas, sequências, esquemas nem tipos (funções: ver M2)');
 
 -- -----------------------------------------------------------------------------
--- D-ACL — privilégios por omissão inalterados (sem impacto em objectos alheios)
--- Linha de base local recolhida antes da M1 (27 entradas). Ambiente-específica.
+-- D-ACL — as migrações do portal não criam nem alteram privilégios por omissão.
+-- Portátil (não depende do conteúdo de pg_default_acl do ambiente).
+-- Controlo COMPLEMENTAR por xmin: cada migração corre numa única transacção, cujo
+-- xmin é o da sua linha no histórico; nenhuma linha de pg_default_acl o pode partilhar.
+-- Limitações documentadas: não detecta linhas APAGADAS (REVOKE que esvazia a ACL)
+-- nem alterações feitas em subtransacções (DO … EXCEPTION). A garantia integral é a
+-- comparação exacta antes/depois das migrações, numa base descartável, no CI
+-- (.github/workflows/ci.yml, job db-tests), com canários GRANT e REVOKE.
+-- A premissa do xmin partilhado é verificada: se o executor deixar de aplicar cada
+-- migração numa só transacção, este teste falha em vez de passar sem detectar nada.
 -- -----------------------------------------------------------------------------
-select is(
-  (select md5(string_agg(
-     pg_get_userbyid(d.defaclrole) || '|' || coalesce(n.nspname::text, '') || '|'
-       || d.defaclobjtype::text || '|' || d.defaclacl::text,
-     E'\n' order by pg_get_userbyid(d.defaclrole), n.nspname, d.defaclobjtype))
-   from pg_default_acl d left join pg_namespace n on n.oid = d.defaclnamespace),
-  'f8d1f848d87de7e8306fca864898853f',
-  'D-ACL: pg_default_acl idêntico à linha de base anterior à M1');
+select is_empty($$
+  select 'xmin:' || d.oid::text from pg_default_acl d
+  where d.xmin::text in (select m.xmin::text from supabase_migrations.schema_migrations m)
+  union all
+  select 'premissa:' || m.version from supabase_migrations.schema_migrations m
+  where not exists (select 1 from pg_class c where c.xmin = m.xmin)
+    and not exists (select 1 from pg_proc p where p.xmin = m.xmin)
+    and not exists (select 1 from pg_namespace n where n.xmin = m.xmin)
+    and not exists (select 1 from pg_type t where t.xmin = m.xmin)
+$$, 'D-ACL: nenhuma migração aplicada criou ou alterou privilégios por omissão (xmin e premissa)');
 
 select is_empty($$
   select d.oid::text from pg_default_acl d left join pg_namespace n on n.oid = d.defaclnamespace
   where n.nspname = 'private'
-     or d.defaclrole in (select oid from pg_roles where rolname in ('portal_guard', 'portal_definer'))
-$$, 'D-ACL: nenhuma entrada de privilégios por omissão do portal');
+     or d.defaclrole in (select oid from pg_roles where rolname like 'portal\_%')
+     or exists (select 1 from aclexplode(d.defaclacl) a
+                where a.grantee in (select oid from pg_roles where rolname like 'portal\_%'))
+$$, 'D-ACL: nenhuma entrada de privilégios por omissão do portal nem concedida a papéis do portal');
 
 select * from finish();
 rollback;

@@ -49,6 +49,18 @@ jobs:
     env:
       NEXT_TELEMETRY_DISABLED: "1"
       DB_CONTAINER: supabase_db_Kilvora_Group_Website
+      # Retrato exacto de pg_default_acl: uma linha por entrada, ordem binária.
+      ACL_QUERY: >-
+        select pg_get_userbyid(d.defaclrole)::text || '|' || coalesce(n.nspname::text, '') || '|'
+        || d.defaclobjtype::text || '|' || d.defaclacl::text
+        from pg_default_acl d left join pg_namespace n on n.oid = d.defaclnamespace
+        order by 1 collate "C"
+      # Hash calculado como na antiga asserção D-ACL (só para documentar o inventário).
+      ACL_LEGACY_MD5_QUERY: >-
+        select md5(string_agg(pg_get_userbyid(d.defaclrole) || '|' || coalesce(n.nspname::text, '') || '|'
+        || d.defaclobjtype::text || '|' || d.defaclacl::text,
+        E'\n' order by pg_get_userbyid(d.defaclrole), n.nspname, d.defaclobjtype))
+        from pg_default_acl d left join pg_namespace n on n.oid = d.defaclnamespace
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -71,11 +83,41 @@ jobs:
           echo "supabase CLI: $version"
           test "$version" = "3.1.0"
 
-      # Base nova em cada execução: o arranque aplica as migrações por ordem (M1 → M2).
-      - name: Start Supabase (fresh database)
+      # D-ACL (antes/depois): as migrações do portal ficam de fora do arranque, para
+      # obter a linha de base numa base limpa. Só a cópia de trabalho efémera do runner
+      # é alterada; nada é versionado.
+      - name: Set aside portal migrations (clean baseline)
+        run: |
+          mkdir -p "$RUNNER_TEMP/portal-migrations"
+          mv supabase/migrations/*.sql "$RUNNER_TEMP/portal-migrations/"
+          ls -1 "$RUNNER_TEMP/portal-migrations"
+          test "$(ls -1 "$RUNNER_TEMP/portal-migrations"/*.sql | wc -l)" -eq 2
+          test -z "$(ls -A supabase/migrations)"
+
+      - name: Start Supabase (clean database, no portal migrations)
         run: >-
           npx supabase start
           -x studio,imgproxy,logflare,vector,supavisor,edge-runtime,realtime,storage-api,postgres-meta,mailpit
+
+      - name: Snapshot pg_default_acl (before portal migrations)
+        run: |
+          clean="$(docker exec -e PGOPTIONS='-c default_transaction_read_only=on' "$DB_CONTAINER" \
+            psql -U postgres -d postgres -XAtc \
+            "select to_regnamespace('private') is null and (select count(*) from pg_roles where rolname like 'portal\_%') = 0")"
+          test "$clean" = "t"
+          docker exec -e PGOPTIONS='-c default_transaction_read_only=on' "$DB_CONTAINER" \
+            psql -U postgres -d postgres -XAt -v ON_ERROR_STOP=1 -c "$ACL_QUERY" > "$RUNNER_TEMP/acl_before.txt"
+          echo "pg_default_acl antes das migrações ($(wc -l < "$RUNNER_TEMP/acl_before.txt") linhas):"
+          cat "$RUNNER_TEMP/acl_before.txt"
+          echo "md5 (fórmula da antiga asserção D-ACL): $(docker exec -e PGOPTIONS='-c default_transaction_read_only=on' \
+            "$DB_CONTAINER" psql -U postgres -d postgres -XAtc "$ACL_LEGACY_MD5_QUERY")"
+          test -s "$RUNNER_TEMP/acl_before.txt"
+
+      - name: Apply portal migrations (M1 → M2, CLI executor)
+        run: |
+          mv "$RUNNER_TEMP/portal-migrations/"*.sql supabase/migrations/
+          git diff --exit-code -- supabase/migrations
+          npx supabase migration up
 
       - name: Migration history (exactly M1 and M2)
         run: |
@@ -84,6 +126,17 @@ jobs:
             "select string_agg(version, ',' order by version) from supabase_migrations.schema_migrations")"
           echo "history=$history"
           test "$history" = "20261113093521,20261113115533"
+
+      - name: pg_default_acl unchanged by portal migrations (exact before/after)
+        run: |
+          docker exec -e PGOPTIONS='-c default_transaction_read_only=on' "$DB_CONTAINER" \
+            psql -U postgres -d postgres -XAt -v ON_ERROR_STOP=1 -c "$ACL_QUERY" > "$RUNNER_TEMP/acl_after.txt"
+          echo "pg_default_acl depois das migrações ($(wc -l < "$RUNNER_TEMP/acl_after.txt") linhas)"
+          if ! diff -u "$RUNNER_TEMP/acl_before.txt" "$RUNNER_TEMP/acl_after.txt"; then
+            echo "As migrações do portal alteraram pg_default_acl"
+            exit 1
+          fi
+          echo "Retratos idênticos: as migrações não alteraram privilégios por omissão."
 
       # Defesa dupla: código de saída (pipefail) e contagem/resultado no registo.
       - name: pgTAP (185 assertions required)
@@ -155,6 +208,62 @@ jobs:
             "select (select count(*) from public.profiles) || ',' || (select count(*) from private.audit_log)")"
           echo "profiles,audit=$counts"
           test "$counts" = "0,0"
+
+      # Canários (depois do pgTAP e da BS-0, só na base descartável): provam em cada
+      # execução que a comparação antes/depois detecta alterações. São independentes:
+      # esquemas próprios, linha de base própria e diferença confinada ao seu esquema.
+      - name: Canary GRANT (default ACL change must be detected)
+        run: |
+          snap() {
+            docker exec -e PGOPTIONS='-c default_transaction_read_only=on' "$DB_CONTAINER" \
+              psql -U postgres -d postgres -XAt -v ON_ERROR_STOP=1 -c "$ACL_QUERY"
+          }
+          snap > "$RUNNER_TEMP/canary_grant_0.txt"
+          docker exec "$DB_CONTAINER" psql -U postgres -d postgres -X -v ON_ERROR_STOP=1 \
+            -c "create schema ci_canary_grant authorization postgres" \
+            -c "alter default privileges for role postgres in schema ci_canary_grant grant select on tables to authenticated"
+          snap > "$RUNNER_TEMP/canary_grant_1.txt"
+          if diff -u "$RUNNER_TEMP/canary_grant_0.txt" "$RUNNER_TEMP/canary_grant_1.txt" > "$RUNNER_TEMP/canary_grant.diff"; then
+            echo "Canário GRANT NÃO detectado"
+            exit 1
+          fi
+          cat "$RUNNER_TEMP/canary_grant.diff"
+          grep -Eq '^\+.*\|ci_canary_grant\|' "$RUNNER_TEMP/canary_grant.diff"
+          outside="$(grep -E '^[+-][^+-]' "$RUNNER_TEMP/canary_grant.diff" | grep -vF '|ci_canary_grant|' || true)"
+          if [ -n "$outside" ]; then
+            echo "Diferença fora do esquema do canário GRANT: $outside"
+            exit 1
+          fi
+
+      - name: Canary REVOKE (prepared default ACL removal must be detected)
+        run: |
+          snap() {
+            docker exec -e PGOPTIONS='-c default_transaction_read_only=on' "$DB_CONTAINER" \
+              psql -U postgres -d postgres -XAt -v ON_ERROR_STOP=1 -c "$ACL_QUERY"
+          }
+          docker exec "$DB_CONTAINER" psql -U postgres -d postgres -X -v ON_ERROR_STOP=1 \
+            -c "create schema ci_canary_revoke authorization postgres" \
+            -c "alter default privileges for role postgres in schema ci_canary_revoke grant select on tables to authenticated"
+          snap > "$RUNNER_TEMP/canary_revoke_0.txt"
+          grep -q '|ci_canary_revoke|' "$RUNNER_TEMP/canary_revoke_0.txt"
+          docker exec "$DB_CONTAINER" psql -U postgres -d postgres -X -v ON_ERROR_STOP=1 \
+            -c "alter default privileges for role postgres in schema ci_canary_revoke revoke select on tables from authenticated"
+          snap > "$RUNNER_TEMP/canary_revoke_1.txt"
+          if diff -u "$RUNNER_TEMP/canary_revoke_0.txt" "$RUNNER_TEMP/canary_revoke_1.txt" > "$RUNNER_TEMP/canary_revoke.diff"; then
+            echo "Canário REVOKE NÃO detectado"
+            exit 1
+          fi
+          cat "$RUNNER_TEMP/canary_revoke.diff"
+          grep -Eq '^-.*\|ci_canary_revoke\|' "$RUNNER_TEMP/canary_revoke.diff"
+          outside="$(grep -E '^[+-][^+-]' "$RUNNER_TEMP/canary_revoke.diff" | grep -vF '|ci_canary_revoke|' || true)"
+          if [ -n "$outside" ]; then
+            echo "Diferença fora do esquema do canário REVOKE: $outside"
+            exit 1
+          fi
+          if grep -q '|ci_canary_revoke|' "$RUNNER_TEMP/canary_revoke_1.txt"; then
+            echo "A entrada preparada não foi removida"
+            exit 1
+          fi
 
       - name: Stop Supabase
         if: always()
