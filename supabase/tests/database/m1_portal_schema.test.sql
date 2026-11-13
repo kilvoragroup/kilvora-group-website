@@ -1,6 +1,12 @@
 -- =============================================================================
 -- KILVORA GROUP — Portal V1 — Testes pgTAP da M1 (estrutura e privilégios)
 -- Cobertura: S1–S6, R-ROLE1–R-ROLE3, R-RLS3, D-ACL, R-MEM, R-PRIV0.
+-- Executável em duas situações, sem perda de cobertura (P1):
+--   * base só com a M1: dados de teste inseridos directamente;
+--   * base com a M2: perfis e contas criados pelo trigger de registo e o
+--     interno provisionado e convidado (sem arranque).
+-- As invariantes valem nas duas situações (as da M2 são verificadas no ficheiro
+-- m2_portal_functions.test.sql).
 -- Executar: npx.cmd supabase test db   (transacção revertida no fim)
 -- =============================================================================
 begin;
@@ -11,29 +17,56 @@ set local search_path = extensions, public, pg_catalog;
 select plan(42);
 
 -- -----------------------------------------------------------------------------
--- Dados de teste (como postgres, dono das tabelas)
+-- Dados de teste (como postgres)
 -- -----------------------------------------------------------------------------
-insert into auth.users (id, email) values
-  ('00000000-0000-4000-8000-0000000000a1', 'm1-cliente-a@example.test'),
-  ('00000000-0000-4000-8000-0000000000b1', 'm1-cliente-b@example.test'),
-  ('00000000-0000-4000-8000-0000000000c1', 'm1-staff@example.test');
+do $fixtures$
+begin
+  if to_regprocedure('private.handle_new_user()') is null then
+    -- Base só com a M1.
+    insert into auth.users (id, email) values
+      ('00000000-0000-4000-8000-0000000000a1', 'm1-cliente-a@example.test'),
+      ('00000000-0000-4000-8000-0000000000b1', 'm1-cliente-b@example.test'),
+      ('00000000-0000-4000-8000-0000000000c1', 'm1-staff@example.test');
+    insert into public.profiles (id, kind, full_name) values
+      ('00000000-0000-4000-8000-0000000000a1', 'cliente', 'Cliente A'),
+      ('00000000-0000-4000-8000-0000000000b1', 'cliente', 'Cliente B'),
+      ('00000000-0000-4000-8000-0000000000c1', 'interno', 'Staff');
+    insert into public.accounts (id, name, created_by) values
+      ('00000000-0000-4000-8000-00000000aaaa', 'Conta X', '00000000-0000-4000-8000-0000000000a1'),
+      ('00000000-0000-4000-8000-00000000bbbb', 'Conta Y', '00000000-0000-4000-8000-0000000000b1');
+    insert into public.account_members (account_id, user_id, member_role) values
+      ('00000000-0000-4000-8000-00000000aaaa', '00000000-0000-4000-8000-0000000000a1', 'titular'),
+      ('00000000-0000-4000-8000-00000000bbbb', '00000000-0000-4000-8000-0000000000b1', 'titular');
+  else
+    -- Base com a M2: registo pelo trigger diferido.
+    insert into auth.users (id, email) values
+      ('00000000-0000-4000-8000-0000000000a1', 'm1-cliente-a@example.test'),
+      ('00000000-0000-4000-8000-0000000000b1', 'm1-cliente-b@example.test');
+    set constraints all immediate;
+    set constraints all deferred;
+    insert into private.staff_provisioning (email_normalized, provisioned_by, expires_at)
+      values ('m1-staff@example.test', '00000000-0000-4000-8000-0000000000a1', now() + interval '72 hours');
+    insert into auth.users (id, email) values ('00000000-0000-4000-8000-0000000000c1', 'm1-staff@example.test');
+    update auth.users set invited_at = now() where id = '00000000-0000-4000-8000-0000000000c1';
+    set constraints all immediate;
+    set constraints all deferred;
+  end if;
+  if (select count(*) from public.profiles
+      where id in ('00000000-0000-4000-8000-0000000000a1', '00000000-0000-4000-8000-0000000000b1')
+        and kind = 'cliente') <> 2
+     or (select kind from public.profiles where id = '00000000-0000-4000-8000-0000000000c1') is distinct from 'interno' then
+    raise exception 'M1 testes: dados de teste inconsistentes';
+  end if;
+end
+$fixtures$;
 
-insert into public.profiles (id, kind, full_name) values
-  ('00000000-0000-4000-8000-0000000000a1', 'cliente', 'Cliente A'),
-  ('00000000-0000-4000-8000-0000000000b1', 'cliente', 'Cliente B'),
-  ('00000000-0000-4000-8000-0000000000c1', 'interno', 'Staff');
-
-insert into public.accounts (id, name, created_by) values
-  ('00000000-0000-4000-8000-00000000aaaa', 'Conta X', '00000000-0000-4000-8000-0000000000a1'),
-  ('00000000-0000-4000-8000-00000000bbbb', 'Conta Y', '00000000-0000-4000-8000-0000000000b1');
-
-insert into public.account_members (account_id, user_id, member_role) values
-  ('00000000-0000-4000-8000-00000000aaaa', '00000000-0000-4000-8000-0000000000a1', 'titular'),
-  ('00000000-0000-4000-8000-00000000bbbb', '00000000-0000-4000-8000-0000000000b1', 'titular');
+create temp table m1ctx as
+  select (select account_id from public.account_members where user_id = '00000000-0000-4000-8000-0000000000a1') as account_x,
+         (select account_id from public.account_members where user_id = '00000000-0000-4000-8000-0000000000b1') as account_y;
 
 insert into public.tickets (id, reference, account_id, requester_id, type, subject, description) values
-  ('00000000-0000-4000-8000-0000000000f1', 'KG-2026-000001',
-   '00000000-0000-4000-8000-00000000aaaa', '00000000-0000-4000-8000-0000000000a1',
+  ('00000000-0000-4000-8000-0000000000f1', 'KG-2000-900001',
+   (select account_x from m1ctx), '00000000-0000-4000-8000-0000000000a1',
    'consultoria', 'Pedido de teste', 'Descrição do pedido de teste.');
 
 insert into public.ticket_events (ticket_id, actor_id, event_type, to_status, visibility) values
@@ -53,8 +86,11 @@ select tables_are('public', array[
   'tickets', 'ticket_events', 'ticket_messages', 'ticket_internal_notes'],
   'S1: public contém exactamente as 8 tabelas do portal');
 
-select tables_are('private', array['audit_log', 'ticket_transitions', 'staff_provisioning'],
-  'S1: private contém exactamente as 3 tabelas internas');
+select tables_are('private',
+  case when to_regclass('private.system_bootstrap') is null
+       then array['audit_log', 'ticket_transitions', 'staff_provisioning']
+       else array['audit_log', 'ticket_transitions', 'staff_provisioning', 'system_bootstrap'] end,
+  'S1: private contém exactamente as 3 tabelas da M1 (e system_bootstrap, se a M2 estiver aplicada)');
 
 select is(
   (select count(*)::int from pg_class c join pg_namespace n on n.oid = c.relnamespace
@@ -64,11 +100,15 @@ select is(
 select is(
   (select count(*)::int from pg_class c join pg_namespace n on n.oid = c.relnamespace
    where n.nspname = 'private' and c.relkind = 'r' and c.relrowsecurity),
-  3, 'S1: as 3 tabelas privadas têm RLS');
+  (select count(*)::int from pg_class c join pg_namespace n on n.oid = c.relnamespace
+   where n.nspname = 'private' and c.relkind = 'r'),
+  'S1: todas as tabelas privadas têm RLS');
 
 select is(
-  (select count(*)::int from pg_policies where schemaname in ('public', 'private')),
-  0, 'S1: M1 não define políticas (negação total)');
+  (select count(*)::int from pg_policies
+   where schemaname in ('public', 'private')
+     and roles && array['public', 'anon', 'authenticated', 'service_role']::name[]),
+  0, 'S1: nenhuma política para os papéis da API (negação total até à M3)');
 
 -- -----------------------------------------------------------------------------
 -- S2 / R-PRIV0 — nenhum privilégio para PUBLIC, anon, authenticated, service_role
@@ -94,10 +134,14 @@ select is_empty($$
   select p.oid::regprocedure::text
   from pg_proc p join pg_namespace n on n.oid = p.pronamespace
   where n.nspname = 'private'
-    and (p.proacl is null or exists (
-      select 1 from aclexplode(p.proacl) a
-      where a.grantee = 0 or a.grantee in (select oid from pg_roles where rolname in ('anon', 'authenticated', 'service_role'))))
-$$, 'R-PRIV0: funções privadas sem EXECUTE para PUBLIC/anon/authenticated/service_role');
+    and (p.proacl is null
+         or exists (
+           select 1 from aclexplode(p.proacl) a
+           where a.grantee = 0 or a.grantee in (select oid from pg_roles where rolname in ('anon', 'service_role')))
+         or (has_function_privilege('authenticated', p.oid, 'EXECUTE')
+             and p.proname not in ('jwt_claims', 'jwt_sub', 'jwt_aal', 'jwt_role', 'is_staff', 'is_admin',
+                                   'is_account_member', 'is_account_owner', 'is_assigned', 'can_view_ticket')))
+$$, 'R-PRIV0: funções privadas sem EXECUTE para PUBLIC/anon/service_role; authenticated só na lista aprovada');
 
 select is_empty($$
   select r from unnest(array['public', 'anon', 'authenticated', 'service_role']) r
@@ -132,7 +176,7 @@ reset role;
 -- -----------------------------------------------------------------------------
 select throws_ok($$
   insert into public.tickets (reference, account_id, requester_id, type, subject, description)
-  values ('KG-2026-000002', '00000000-0000-4000-8000-00000000aaaa', '00000000-0000-4000-8000-0000000000b1',
+  values ('KG-2000-900002', (select account_x from m1ctx), '00000000-0000-4000-8000-0000000000b1',
           'consultoria', 'Cruzado', 'Requerente de outra conta.')
 $$, '23503', null, 'S3: FK composta recusa requerente de outra conta');
 
@@ -141,7 +185,7 @@ select throws_ok($$
 $$, '23503', null, 'S3: perfil exige utilizador em auth.users');
 
 select throws_ok($$
-  delete from public.accounts where id = '00000000-0000-4000-8000-00000000aaaa'
+  delete from public.accounts where id = (select account_x from m1ctx)
 $$, '23503', null, 'S3: ON DELETE RESTRICT protege contas com membros');
 
 -- -----------------------------------------------------------------------------
@@ -157,7 +201,7 @@ $$, '23514', null, 'S4: closed_at exige estado terminal');
 
 select throws_ok($$
   insert into public.tickets (reference, account_id, requester_id, type, subject, description)
-  values ('KG-26-1', '00000000-0000-4000-8000-00000000aaaa', '00000000-0000-4000-8000-0000000000a1',
+  values ('KG-26-1', (select account_x from m1ctx), '00000000-0000-4000-8000-0000000000a1',
           'consultoria', 'Referência', 'Referência inválida.')
 $$, '23514', null, 'S4: formato da referência validado');
 
@@ -194,12 +238,15 @@ select throws_ok($$ truncate private.audit_log $$, '42501', null, 'S5: audit_log
 -- -----------------------------------------------------------------------------
 select throws_ok($$
   insert into public.account_members (account_id, user_id, member_role)
-  values ('00000000-0000-4000-8000-00000000aaaa', '00000000-0000-4000-8000-0000000000b1', 'titular')
+  values ((select account_x from m1ctx), '00000000-0000-4000-8000-0000000000b1', 'titular')
 $$, '23505', null, 'S6: um único titular por conta');
 
-insert into public.user_roles (user_id, role) values ('00000000-0000-4000-8000-0000000000c1', 'operador');
+-- granted_by não nulo: a M2 só aceita granted_by nulo no arranque do primeiro admin.
+insert into public.user_roles (user_id, role, granted_by)
+  values ('00000000-0000-4000-8000-0000000000c1', 'operador', '00000000-0000-4000-8000-0000000000a1');
 select throws_ok($$
-  insert into public.user_roles (user_id, role) values ('00000000-0000-4000-8000-0000000000c1', 'operador')
+  insert into public.user_roles (user_id, role, granted_by)
+  values ('00000000-0000-4000-8000-0000000000c1', 'operador', '00000000-0000-4000-8000-0000000000a1')
 $$, '23505', null, 'S6: um único papel activo por utilizador e papel');
 
 select throws_ok($$
@@ -241,12 +288,9 @@ select is_empty($$
   select 'schema ' || nspname from pg_namespace
    where nspowner in (select oid from pg_roles where rolname in ('portal_guard', 'portal_definer'))
   union all
-  select 'proc ' || oid::regprocedure::text from pg_proc
-   where proowner in (select oid from pg_roles where rolname in ('portal_guard', 'portal_definer'))
-  union all
   select 'type ' || oid::regtype::text from pg_type
    where typowner in (select oid from pg_roles where rolname in ('portal_guard', 'portal_definer'))
-$$, 'R-ROLE3: papéis dedicados não são donos de nenhum objecto');
+$$, 'R-ROLE3: papéis dedicados não são donos de tabelas, sequências, esquemas nem tipos (funções: ver M2)');
 
 -- -----------------------------------------------------------------------------
 -- D-ACL — privilégios por omissão inalterados (sem impacto em objectos alheios)
