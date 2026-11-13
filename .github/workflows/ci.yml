@@ -51,10 +51,12 @@ jobs:
       DB_CONTAINER: supabase_db_Kilvora_Group_Website
       # Retrato exacto de pg_default_acl: uma linha por entrada, ordem binária.
       ACL_QUERY: >-
-        select pg_get_userbyid(d.defaclrole)::text || '|' || coalesce(n.nspname::text, '') || '|'
-        || d.defaclobjtype::text || '|' || d.defaclacl::text
+        select s.line from (
+        select (pg_get_userbyid(d.defaclrole)::text || '|' || coalesce(n.nspname::text, '') || '|'
+        || d.defaclobjtype::text || '|' || d.defaclacl::text)::text as line
         from pg_default_acl d left join pg_namespace n on n.oid = d.defaclnamespace
-        order by 1 collate "C"
+        ) s
+        order by s.line collate "C"
       # Hash calculado como na antiga asserção D-ACL (só para documentar o inventário).
       ACL_LEGACY_MD5_QUERY: >-
         select md5(string_agg(pg_get_userbyid(d.defaclrole) || '|' || coalesce(n.nspname::text, '') || '|'
@@ -94,10 +96,30 @@ jobs:
           test "$(ls -1 "$RUNNER_TEMP/portal-migrations"/*.sql | wc -l)" -eq 2
           test -z "$(ls -A supabase/migrations)"
 
+      # A saída do arranque inclui chaves e credenciais locais (publishable, secret,
+      # JWT, S3, palavra-passe no URL). Vai para um ficheiro temporário, é sempre
+      # impressa filtrada (sucesso ou falha) e o original é apagado sem ser publicado.
+      # O código de saída do Supabase é preservado.
       - name: Start Supabase (clean database, no portal migrations)
-        run: >-
-          npx supabase start
-          -x studio,imgproxy,logflare,vector,supavisor,edge-runtime,realtime,storage-api,postgres-meta,mailpit
+        run: |
+          start_log="$RUNNER_TEMP/supabase-start.raw.log"
+          set +e
+          npx supabase start \
+            -x studio,imgproxy,logflare,vector,supavisor,edge-runtime,realtime,storage-api,postgres-meta,mailpit \
+            > "$start_log" 2>&1
+          code=$?
+          set -e
+          sed -E \
+            -e 's/(sb_(publishable|secret)_)[A-Za-z0-9_-]+/\1***/g' \
+            -e 's/eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/eyJ***/g' \
+            -e 's#(postgres(ql)?://[^:/@[:space:]"]+:)[^@[:space:]"]+@#\1***@#g' \
+            -e 's/("[A-Za-z0-9_]*(KEY|SECRET|TOKEN|PASSWORD)[A-Za-z0-9_]*"[[:space:]]*:[[:space:]]*")[^"]*"/\1***"/Ig' \
+            -e '/^[[:space:]]*\{/!s/^([^│]*(key|secret|token|password)[^:=│]*[:=][[:space:]]*)[^[:space:]]+/\1***/I' \
+            -e 's/(│[^│]*(key|secret|token|password)[^│]*│[[:space:]]*)[^│[:space:]]+/\1***/Ig' \
+            "$start_log"
+          rm -f "$start_log"
+          echo "supabase start exit code: $code"
+          exit "$code"
 
       - name: Snapshot pg_default_acl (before portal migrations)
         run: |
