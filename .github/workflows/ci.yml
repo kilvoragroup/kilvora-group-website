@@ -38,3 +38,255 @@ jobs:
 
       - name: Verify
         run: npm run verify
+
+  db-tests:
+    name: Database (Supabase, pgTAP)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        shell: bash
+    env:
+      NEXT_TELEMETRY_DISABLED: "1"
+      DB_CONTAINER: supabase_db_Kilvora_Group_Website
+      # Retrato exacto de pg_default_acl: uma linha por entrada, ordem binária.
+      ACL_QUERY: >-
+        select s.line from (
+        select (pg_get_userbyid(d.defaclrole)::text || '|' || coalesce(n.nspname::text, '') || '|'
+        || d.defaclobjtype::text || '|' || d.defaclacl::text)::text as line
+        from pg_default_acl d left join pg_namespace n on n.oid = d.defaclnamespace
+        ) s
+        order by s.line collate "C"
+      # Hash calculado como na antiga asserção D-ACL (só para documentar o inventário).
+      ACL_LEGACY_MD5_QUERY: >-
+        select md5(string_agg(pg_get_userbyid(d.defaclrole) || '|' || coalesce(n.nspname::text, '') || '|'
+        || d.defaclobjtype::text || '|' || d.defaclacl::text,
+        E'\n' order by pg_get_userbyid(d.defaclrole), n.nspname, d.defaclobjtype))
+        from pg_default_acl d left join pg_namespace n on n.oid = d.defaclnamespace
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Supabase CLI version (pinned 3.1.0)
+        run: |
+          version="$(npx supabase --version)"
+          echo "supabase CLI: $version"
+          test "$version" = "3.1.0"
+
+      # D-ACL (antes/depois): as migrações do portal ficam de fora do arranque, para
+      # obter a linha de base numa base limpa. Só a cópia de trabalho efémera do runner
+      # é alterada; nada é versionado.
+      - name: Set aside portal migrations (clean baseline)
+        run: |
+          mkdir -p "$RUNNER_TEMP/portal-migrations"
+          mv supabase/migrations/*.sql "$RUNNER_TEMP/portal-migrations/"
+          ls -1 "$RUNNER_TEMP/portal-migrations"
+          test "$(ls -1 "$RUNNER_TEMP/portal-migrations"/*.sql | wc -l)" -eq 2
+          test -z "$(ls -A supabase/migrations)"
+
+      # A saída do arranque inclui chaves e credenciais locais (publishable, secret,
+      # JWT, S3, palavra-passe no URL). Vai para um ficheiro temporário, é sempre
+      # impressa filtrada (sucesso ou falha) e o original é apagado sem ser publicado.
+      # O código de saída do Supabase é preservado.
+      - name: Start Supabase (clean database, no portal migrations)
+        run: |
+          start_log="$RUNNER_TEMP/supabase-start.raw.log"
+          set +e
+          npx supabase start \
+            -x studio,imgproxy,logflare,vector,supavisor,edge-runtime,realtime,storage-api,postgres-meta,mailpit \
+            > "$start_log" 2>&1
+          code=$?
+          set -e
+          sed -E \
+            -e 's/(sb_(publishable|secret)_)[A-Za-z0-9_-]+/\1***/g' \
+            -e 's/eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/eyJ***/g' \
+            -e 's#(postgres(ql)?://[^:/@[:space:]"]+:)[^@[:space:]"]+@#\1***@#g' \
+            -e 's/("[A-Za-z0-9_]*(KEY|SECRET|TOKEN|PASSWORD)[A-Za-z0-9_]*"[[:space:]]*:[[:space:]]*")[^"]*"/\1***"/Ig' \
+            -e '/^[[:space:]]*\{/!s/^([^│]*(key|secret|token|password)[^:=│]*[:=][[:space:]]*)[^[:space:]]+/\1***/I' \
+            -e 's/(│[^│]*(key|secret|token|password)[^│]*│[[:space:]]*)[^│[:space:]]+/\1***/Ig' \
+            "$start_log"
+          rm -f "$start_log"
+          echo "supabase start exit code: $code"
+          exit "$code"
+
+      - name: Snapshot pg_default_acl (before portal migrations)
+        run: |
+          clean="$(docker exec -e PGOPTIONS='-c default_transaction_read_only=on' "$DB_CONTAINER" \
+            psql -U postgres -d postgres -XAtc \
+            "select to_regnamespace('private') is null and (select count(*) from pg_roles where rolname like 'portal\_%') = 0")"
+          test "$clean" = "t"
+          docker exec -e PGOPTIONS='-c default_transaction_read_only=on' "$DB_CONTAINER" \
+            psql -U postgres -d postgres -XAt -v ON_ERROR_STOP=1 -c "$ACL_QUERY" > "$RUNNER_TEMP/acl_before.txt"
+          echo "pg_default_acl antes das migrações ($(wc -l < "$RUNNER_TEMP/acl_before.txt") linhas):"
+          cat "$RUNNER_TEMP/acl_before.txt"
+          echo "md5 (fórmula da antiga asserção D-ACL): $(docker exec -e PGOPTIONS='-c default_transaction_read_only=on' \
+            "$DB_CONTAINER" psql -U postgres -d postgres -XAtc "$ACL_LEGACY_MD5_QUERY")"
+          test -s "$RUNNER_TEMP/acl_before.txt"
+
+      - name: Apply portal migrations (M1 → M2, CLI executor)
+        run: |
+          mv "$RUNNER_TEMP/portal-migrations/"*.sql supabase/migrations/
+          git diff --exit-code -- supabase/migrations
+          npx supabase migration up
+
+      - name: Migration history (exactly M1 and M2)
+        run: |
+          history="$(docker exec -e PGOPTIONS='-c default_transaction_read_only=on' "$DB_CONTAINER" \
+            psql -U postgres -d postgres -XAtc \
+            "select string_agg(version, ',' order by version) from supabase_migrations.schema_migrations")"
+          echo "history=$history"
+          test "$history" = "20261113093521,20261113115533"
+
+      - name: pg_default_acl unchanged by portal migrations (exact before/after)
+        run: |
+          docker exec -e PGOPTIONS='-c default_transaction_read_only=on' "$DB_CONTAINER" \
+            psql -U postgres -d postgres -XAt -v ON_ERROR_STOP=1 -c "$ACL_QUERY" > "$RUNNER_TEMP/acl_after.txt"
+          echo "pg_default_acl depois das migrações ($(wc -l < "$RUNNER_TEMP/acl_after.txt") linhas)"
+          if ! diff -u "$RUNNER_TEMP/acl_before.txt" "$RUNNER_TEMP/acl_after.txt"; then
+            echo "As migrações do portal alteraram pg_default_acl"
+            exit 1
+          fi
+          echo "Retratos idênticos: as migrações não alteraram privilégios por omissão."
+
+      # Defesa dupla: código de saída (pipefail) e contagem/resultado no registo.
+      - name: pgTAP (185 assertions required)
+        run: |
+          npx supabase test db 2>&1 | tee pgtap.log
+          grep -Eq 'Files=2, Tests=185,' pgtap.log
+          grep -Fq 'Result: PASS' pgtap.log
+
+      - name: Catalog security checks (read-only)
+        run: |
+          docker exec -i -e PGOPTIONS='-c default_transaction_read_only=on' "$DB_CONTAINER" \
+            psql -U postgres -d postgres -X -v ON_ERROR_STOP=1 <<'SQL'
+          do $$
+          begin
+            if exists (
+              select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+              where n.nspname in ('public', 'private') and p.prosecdef
+                and pg_get_userbyid(p.proowner) not in ('portal_guard', 'portal_definer', 'portal_registrar')
+            ) then
+              raise exception 'SECURITY DEFINER fora dos papéis do portal';
+            end if;
+            if exists (
+              select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+              where n.nspname in ('public', 'private')
+                and not coalesce(p.proconfig @> array['search_path=""'], false)
+            ) then
+              raise exception 'função do portal sem search_path vazio';
+            end if;
+            if exists (
+              select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+              where n.nspname in ('public', 'private')
+                and (p.proacl is null or exists (
+                  select 1 from aclexplode(p.proacl) a
+                  where a.grantee = 0
+                     or a.grantee in (select oid from pg_roles where rolname in ('anon', 'service_role'))))
+            ) then
+              raise exception 'EXECUTE para PUBLIC, anon ou service_role';
+            end if;
+            if (select count(*) from pg_class c join pg_namespace n on n.oid = c.relnamespace
+                where n.nspname = 'public' and c.relkind = 'r'
+                  and c.relrowsecurity and c.relforcerowsecurity) <> 8 then
+              raise exception 'RLS/FORCE RLS em falta nas tabelas públicas';
+            end if;
+          end
+          $$;
+          SQL
+
+      # Prova BS-0 (base efémera): um provisionamento de arranque pendente tem de
+      # interromper a suíte com "Bail out!", sem falso sucesso e com reversão.
+      - name: BS-0 proof (must bail out and roll back)
+        run: |
+          docker exec "$DB_CONTAINER" psql -U postgres -d postgres -X -v ON_ERROR_STOP=1 -c \
+            "insert into private.staff_provisioning (email_normalized, expires_at)
+             values ('ci-bs0@example.test', now() + interval '1 hour')"
+          set +e
+          npx supabase test db > bs0.log 2>&1
+          code=$?
+          set -e
+          cat bs0.log
+          echo "exit code: $code"
+          test "$code" -ne 0
+          grep -Eq 'Bail ?out' bs0.log
+          if grep -Fq 'Result: PASS' bs0.log; then
+            echo "Falso sucesso: a suíte não foi interrompida pela BS-0"
+            exit 1
+          fi
+          counts="$(docker exec -e PGOPTIONS='-c default_transaction_read_only=on' "$DB_CONTAINER" \
+            psql -U postgres -d postgres -XAtc \
+            "select (select count(*) from public.profiles) || ',' || (select count(*) from private.audit_log)")"
+          echo "profiles,audit=$counts"
+          test "$counts" = "0,0"
+
+      # Canários (depois do pgTAP e da BS-0, só na base descartável): provam em cada
+      # execução que a comparação antes/depois detecta alterações. São independentes:
+      # esquemas próprios, linha de base própria e diferença confinada ao seu esquema.
+      - name: Canary GRANT (default ACL change must be detected)
+        run: |
+          snap() {
+            docker exec -e PGOPTIONS='-c default_transaction_read_only=on' "$DB_CONTAINER" \
+              psql -U postgres -d postgres -XAt -v ON_ERROR_STOP=1 -c "$ACL_QUERY"
+          }
+          snap > "$RUNNER_TEMP/canary_grant_0.txt"
+          docker exec "$DB_CONTAINER" psql -U postgres -d postgres -X -v ON_ERROR_STOP=1 \
+            -c "create schema ci_canary_grant authorization postgres" \
+            -c "alter default privileges for role postgres in schema ci_canary_grant grant select on tables to authenticated"
+          snap > "$RUNNER_TEMP/canary_grant_1.txt"
+          if diff -u "$RUNNER_TEMP/canary_grant_0.txt" "$RUNNER_TEMP/canary_grant_1.txt" > "$RUNNER_TEMP/canary_grant.diff"; then
+            echo "Canário GRANT NÃO detectado"
+            exit 1
+          fi
+          cat "$RUNNER_TEMP/canary_grant.diff"
+          grep -Eq '^\+.*\|ci_canary_grant\|' "$RUNNER_TEMP/canary_grant.diff"
+          outside="$(grep -E '^[+-][^+-]' "$RUNNER_TEMP/canary_grant.diff" | grep -vF '|ci_canary_grant|' || true)"
+          if [ -n "$outside" ]; then
+            echo "Diferença fora do esquema do canário GRANT: $outside"
+            exit 1
+          fi
+
+      - name: Canary REVOKE (prepared default ACL removal must be detected)
+        run: |
+          snap() {
+            docker exec -e PGOPTIONS='-c default_transaction_read_only=on' "$DB_CONTAINER" \
+              psql -U postgres -d postgres -XAt -v ON_ERROR_STOP=1 -c "$ACL_QUERY"
+          }
+          docker exec "$DB_CONTAINER" psql -U postgres -d postgres -X -v ON_ERROR_STOP=1 \
+            -c "create schema ci_canary_revoke authorization postgres" \
+            -c "alter default privileges for role postgres in schema ci_canary_revoke grant select on tables to authenticated"
+          snap > "$RUNNER_TEMP/canary_revoke_0.txt"
+          grep -q '|ci_canary_revoke|' "$RUNNER_TEMP/canary_revoke_0.txt"
+          docker exec "$DB_CONTAINER" psql -U postgres -d postgres -X -v ON_ERROR_STOP=1 \
+            -c "alter default privileges for role postgres in schema ci_canary_revoke revoke select on tables from authenticated"
+          snap > "$RUNNER_TEMP/canary_revoke_1.txt"
+          if diff -u "$RUNNER_TEMP/canary_revoke_0.txt" "$RUNNER_TEMP/canary_revoke_1.txt" > "$RUNNER_TEMP/canary_revoke.diff"; then
+            echo "Canário REVOKE NÃO detectado"
+            exit 1
+          fi
+          cat "$RUNNER_TEMP/canary_revoke.diff"
+          grep -Eq '^-.*\|ci_canary_revoke\|' "$RUNNER_TEMP/canary_revoke.diff"
+          outside="$(grep -E '^[+-][^+-]' "$RUNNER_TEMP/canary_revoke.diff" | grep -vF '|ci_canary_revoke|' || true)"
+          if [ -n "$outside" ]; then
+            echo "Diferença fora do esquema do canário REVOKE: $outside"
+            exit 1
+          fi
+          if grep -q '|ci_canary_revoke|' "$RUNNER_TEMP/canary_revoke_1.txt"; then
+            echo "A entrada preparada não foi removida"
+            exit 1
+          fi
+
+      - name: Stop Supabase
+        if: always()
+        run: npx supabase stop --no-backup
