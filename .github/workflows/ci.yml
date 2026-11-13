@@ -38,3 +38,124 @@ jobs:
 
       - name: Verify
         run: npm run verify
+
+  db-tests:
+    name: Database (Supabase, pgTAP)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        shell: bash
+    env:
+      NEXT_TELEMETRY_DISABLED: "1"
+      DB_CONTAINER: supabase_db_Kilvora_Group_Website
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Supabase CLI version (pinned 3.1.0)
+        run: |
+          version="$(npx supabase --version)"
+          echo "supabase CLI: $version"
+          test "$version" = "3.1.0"
+
+      # Base nova em cada execução: o arranque aplica as migrações por ordem (M1 → M2).
+      - name: Start Supabase (fresh database)
+        run: >-
+          npx supabase start
+          -x studio,imgproxy,logflare,vector,supavisor,edge-runtime,realtime,storage-api,postgres-meta,mailpit
+
+      - name: Migration history (exactly M1 and M2)
+        run: |
+          history="$(docker exec -e PGOPTIONS='-c default_transaction_read_only=on' "$DB_CONTAINER" \
+            psql -U postgres -d postgres -XAtc \
+            "select string_agg(version, ',' order by version) from supabase_migrations.schema_migrations")"
+          echo "history=$history"
+          test "$history" = "20261113093521,20261113115533"
+
+      # Defesa dupla: código de saída (pipefail) e contagem/resultado no registo.
+      - name: pgTAP (185 assertions required)
+        run: |
+          npx supabase test db 2>&1 | tee pgtap.log
+          grep -Eq 'Files=2, Tests=185,' pgtap.log
+          grep -Fq 'Result: PASS' pgtap.log
+
+      - name: Catalog security checks (read-only)
+        run: |
+          docker exec -i -e PGOPTIONS='-c default_transaction_read_only=on' "$DB_CONTAINER" \
+            psql -U postgres -d postgres -X -v ON_ERROR_STOP=1 <<'SQL'
+          do $$
+          begin
+            if exists (
+              select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+              where n.nspname in ('public', 'private') and p.prosecdef
+                and pg_get_userbyid(p.proowner) not in ('portal_guard', 'portal_definer', 'portal_registrar')
+            ) then
+              raise exception 'SECURITY DEFINER fora dos papéis do portal';
+            end if;
+            if exists (
+              select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+              where n.nspname in ('public', 'private')
+                and not coalesce(p.proconfig @> array['search_path=""'], false)
+            ) then
+              raise exception 'função do portal sem search_path vazio';
+            end if;
+            if exists (
+              select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+              where n.nspname in ('public', 'private')
+                and (p.proacl is null or exists (
+                  select 1 from aclexplode(p.proacl) a
+                  where a.grantee = 0
+                     or a.grantee in (select oid from pg_roles where rolname in ('anon', 'service_role'))))
+            ) then
+              raise exception 'EXECUTE para PUBLIC, anon ou service_role';
+            end if;
+            if (select count(*) from pg_class c join pg_namespace n on n.oid = c.relnamespace
+                where n.nspname = 'public' and c.relkind = 'r'
+                  and c.relrowsecurity and c.relforcerowsecurity) <> 8 then
+              raise exception 'RLS/FORCE RLS em falta nas tabelas públicas';
+            end if;
+          end
+          $$;
+          SQL
+
+      # Prova BS-0 (base efémera): um provisionamento de arranque pendente tem de
+      # interromper a suíte com "Bail out!", sem falso sucesso e com reversão.
+      - name: BS-0 proof (must bail out and roll back)
+        run: |
+          docker exec "$DB_CONTAINER" psql -U postgres -d postgres -X -v ON_ERROR_STOP=1 -c \
+            "insert into private.staff_provisioning (email_normalized, expires_at)
+             values ('ci-bs0@example.test', now() + interval '1 hour')"
+          set +e
+          npx supabase test db > bs0.log 2>&1
+          code=$?
+          set -e
+          cat bs0.log
+          echo "exit code: $code"
+          test "$code" -ne 0
+          grep -Eq 'Bail ?out' bs0.log
+          if grep -Fq 'Result: PASS' bs0.log; then
+            echo "Falso sucesso: a suíte não foi interrompida pela BS-0"
+            exit 1
+          fi
+          counts="$(docker exec -e PGOPTIONS='-c default_transaction_read_only=on' "$DB_CONTAINER" \
+            psql -U postgres -d postgres -XAtc \
+            "select (select count(*) from public.profiles) || ',' || (select count(*) from private.audit_log)")"
+          echo "profiles,audit=$counts"
+          test "$counts" = "0,0"
+
+      - name: Stop Supabase
+        if: always()
+        run: npx supabase stop --no-backup
