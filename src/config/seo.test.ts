@@ -25,10 +25,10 @@ describe("isIndexableEnv", () => {
 });
 
 describe("robotsMetadata / robotsRules", () => {
-  it("indexável: index, follow e robots.txt exclui apenas /cliente/", () => {
+  it("indexável: index, follow e robots.txt exclui apenas /cliente/ e /interno/", () => {
     expect(robotsMetadata(true)).toEqual({ index: true, follow: true });
     expect(robotsRules(true, SITE_URL)).toEqual({
-      rules: { userAgent: "*", allow: "/", disallow: "/cliente/" },
+      rules: { userAgent: "*", allow: "/", disallow: ["/cliente/", "/interno/"] },
       sitemap: `${SITE_URL}/sitemap.xml`,
     });
   });
@@ -65,18 +65,19 @@ describe("módulos reais por ambiente (site, robots, sitemap)", () => {
 
     if (indexable) {
       expect(robots).toEqual({
-        rules: { userAgent: "*", allow: "/", disallow: "/cliente/" },
+        rules: { userAgent: "*", allow: "/", disallow: ["/cliente/", "/interno/"] },
         sitemap: `${SITE_URL}/sitemap.xml`,
       });
     } else {
       expect(robots).toEqual({ rules: { userAgent: "*", disallow: "/" } });
     }
 
-    // O sitemap usa sempre URLs canónicas e nunca inclui /cliente.
+    // O sitemap usa sempre URLs canónicas e nunca inclui as zonas do portal.
     expect(sitemap.length).toBeGreaterThan(10);
     for (const entry of sitemap) {
       expect(entry.url.startsWith(SITE_URL)).toBe(true);
       expect(entry.url).not.toContain("/cliente");
+      expect(entry.url).not.toContain("/interno");
     }
   });
 });
