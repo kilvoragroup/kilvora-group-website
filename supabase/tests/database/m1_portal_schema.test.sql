@@ -6,7 +6,9 @@
 --   * base com a M2: perfis e contas criados pelo trigger de registo e o
 --     interno provisionado e convidado (sem arranque).
 -- As invariantes valem nas duas situações (as da M2 são verificadas no ficheiro
--- m2_portal_functions.test.sql).
+-- m2_portal_functions.test.sql). Com a M3 aplicada, as invariantes de exposição
+-- (S1, S2, R-PRIV0) aceitam apenas a exposição exacta da M3 a authenticated;
+-- PUBLIC, anon e service_role continuam sem qualquer privilégio ou política.
 -- Executar: npx.cmd supabase test db   (transacção revertida no fim)
 -- =============================================================================
 begin;
@@ -15,6 +17,21 @@ create extension if not exists pgtap with schema extensions;
 set local search_path = extensions, public, pg_catalog;
 
 select plan(42);
+
+-- M3 aplicada? Determinado pelo histórico de migrações (nunca pelo próprio
+-- estado de exposição que se pretende verificar).
+create function pg_temp.m3_applied()
+  returns boolean language plpgsql stable as $fn$
+declare
+  v_applied boolean := false;
+begin
+  if to_regclass('supabase_migrations.schema_migrations') is not null then
+    execute $q$ select exists (select 1 from supabase_migrations.schema_migrations
+                               where version = '20261113212446') $q$ into v_applied;
+  end if;
+  return v_applied;
+end
+$fn$;
 
 -- -----------------------------------------------------------------------------
 -- Dados de teste (como postgres)
@@ -104,31 +121,59 @@ select is(
    where n.nspname = 'private' and c.relkind = 'r'),
   'S1: todas as tabelas privadas têm RLS');
 
-select is(
-  (select count(*)::int from pg_policies
-   where schemaname in ('public', 'private')
-     and roles && array['public', 'anon', 'authenticated', 'service_role']::name[]),
-  0, 'S1: nenhuma política para os papéis da API (negação total até à M3)');
+select is_empty($$
+  select schemaname::text || '.' || tablename::text || ':' || policyname::text
+  from pg_policies
+  where schemaname in ('public', 'private')
+    and (roles && array['public', 'anon', 'service_role']::name[]
+         or ('authenticated' = any(roles)
+             and (not pg_temp.m3_applied()
+                  or schemaname <> 'public'
+                  or roles <> array['authenticated']::name[]
+                  or policyname::text not in (
+                       'api_profiles_select', 'api_profiles_update_self', 'api_accounts_select',
+                       'api_accounts_update_owner', 'api_account_members_select', 'api_user_roles_select',
+                       'api_tickets_select', 'api_ticket_events_select', 'api_ticket_events_restrict',
+                       'api_ticket_messages_select', 'api_ticket_internal_notes_select',
+                       'api_ticket_internal_notes_restrict'))))
+$$, 'S1: sem políticas para PUBLIC/anon/service_role; authenticated só com as 12 políticas api_* da M3');
 
 -- -----------------------------------------------------------------------------
--- S2 / R-PRIV0 — nenhum privilégio para PUBLIC, anon, authenticated, service_role
+-- S2 / R-PRIV0 — PUBLIC, anon e service_role sem privilégios; authenticated sem
+-- privilégios até à M3 e, depois dela, apenas a exposição exacta da M3.
 -- -----------------------------------------------------------------------------
 select is_empty($$
-  select c.oid::regclass::text
+  select c.oid::regclass::text || ':' || a.privilege_type
   from pg_class c join pg_namespace n on n.oid = c.relnamespace
   cross join lateral aclexplode(c.relacl) a
   where n.nspname in ('public', 'private')
-    and (a.grantee = 0 or a.grantee in (select oid from pg_roles where rolname in ('anon', 'authenticated', 'service_role')))
-$$, 'R-PRIV0: sem ACL proibida em tabelas e sequências');
+    and (a.grantee = 0
+         or a.grantee in (select oid from pg_roles where rolname in ('anon', 'service_role'))
+         or (a.grantee = 'authenticated'::regrole
+             and not (pg_temp.m3_applied() and n.nspname = 'public' and c.relkind = 'r'
+                      and a.privilege_type = 'SELECT'
+                      and c.relname in ('profiles', 'accounts', 'account_members', 'user_roles',
+                                        'tickets', 'ticket_messages', 'ticket_internal_notes'))))
+$$, 'R-PRIV0: sem ACL proibida em tabelas e sequências (authenticated só SELECT M3 em 7 tabelas públicas)');
 
 select is_empty($$
-  select c.oid::regclass::text || '.' || att.attname
+  select c.oid::regclass::text || '.' || att.attname || ':' || a.privilege_type
   from pg_attribute att join pg_class c on c.oid = att.attrelid
   join pg_namespace n on n.oid = c.relnamespace
   cross join lateral aclexplode(att.attacl) a
   where n.nspname in ('public', 'private') and att.attacl is not null
-    and (a.grantee = 0 or a.grantee in (select oid from pg_roles where rolname in ('anon', 'authenticated', 'service_role')))
-$$, 'R-PRIV0: sem ACL proibida em colunas');
+    and (a.grantee = 0
+         or a.grantee in (select oid from pg_roles where rolname in ('anon', 'service_role'))
+         or (a.grantee = 'authenticated'::regrole
+             and not (pg_temp.m3_applied() and n.nspname = 'public'
+                      and ((c.relname = 'ticket_events' and a.privilege_type = 'SELECT'
+                            and att.attname in ('id', 'ticket_id', 'actor_id', 'event_type', 'from_status',
+                                                'to_status', 'reason', 'visibility', 'created_at'))
+                           or (c.relname = 'profiles' and a.privilege_type = 'UPDATE'
+                               and att.attname in ('full_name', 'phone', 'locale'))
+                           or (c.relname = 'accounts' and a.privilege_type = 'UPDATE'
+                               and att.attname in ('name', 'country', 'sector'))))))
+$$, 'R-PRIV0: sem ACL proibida em colunas (authenticated só a lista M3; nunca evidence_ref)');
 
 select is_empty($$
   select p.oid::regprocedure::text
@@ -145,20 +190,27 @@ $$, 'R-PRIV0: funções privadas sem EXECUTE para PUBLIC/anon/service_role; auth
 
 select is_empty($$
   select r from unnest(array['public', 'anon', 'authenticated', 'service_role']) r
-  where has_schema_privilege(r, 'private', 'USAGE') or has_schema_privilege(r, 'private', 'CREATE')
-$$, 'R-PRIV0: esquema private sem USAGE/CREATE para os papéis da API');
+  where has_schema_privilege(r, 'private', 'CREATE')
+     or (has_schema_privilege(r, 'private', 'USAGE')
+         and not (r = 'authenticated' and pg_temp.m3_applied()))
+$$, 'R-PRIV0: esquema private sem CREATE; USAGE só para authenticated com a M3');
 
 select is_empty($$
   select r.rolname || ' em ' || c.oid::regclass::text
   from pg_class c join pg_namespace n on n.oid = c.relnamespace
   cross join (values ('public'), ('anon'), ('authenticated'), ('service_role')) as r(rolname)
   where n.nspname in ('public', 'private') and c.relkind in ('r', 'S')
-    and has_table_privilege(r.rolname, c.oid, 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
-$$, 'S2: has_table_privilege falso para todos os papéis da API');
+    and (has_table_privilege(r.rolname, c.oid, 'INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
+         or (has_table_privilege(r.rolname, c.oid, 'SELECT')
+             and not (r.rolname = 'authenticated' and pg_temp.m3_applied()
+                      and n.nspname = 'public' and c.relkind = 'r'
+                      and c.relname in ('profiles', 'accounts', 'account_members', 'user_roles',
+                                        'tickets', 'ticket_messages', 'ticket_internal_notes'))))
+$$, 'S2: has_table_privilege falso para os papéis da API (excepto SELECT M3 de authenticated)');
 
 set local role authenticated;
-select throws_ok($$ select * from public.tickets $$, '42501', null,
-  'S2: authenticated não lê tickets');
+select throws_ok($$ insert into public.tickets default values $$, '42501', null,
+  'S2: authenticated não insere em tickets');
 reset role;
 
 set local role anon;
