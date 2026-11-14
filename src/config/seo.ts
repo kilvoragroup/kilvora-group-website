@@ -19,13 +19,16 @@ export function robotsMetadata(indexable: boolean): NonNullable<Metadata["robots
     : { index: false, follow: false, nocache: true, googleBot: { index: false, follow: false } };
 }
 
-/** Regras do robots.txt: indexação pública com `/cliente/` excluído, ou bloqueio total. */
+/**
+ * Regras do robots.txt: indexação pública com as zonas do portal (`/cliente/` e `/interno/`,
+ * D02) excluídas, ou bloqueio total.
+ */
 export function robotsRules(indexable: boolean, siteUrl: string): MetadataRoute.Robots {
   if (!indexable) {
     return { rules: { userAgent: "*", disallow: "/" } };
   }
   return {
-    rules: { userAgent: "*", allow: "/", disallow: "/cliente/" },
+    rules: { userAgent: "*", allow: "/", disallow: ["/cliente/", "/interno/"] },
     sitemap: `${siteUrl}/sitemap.xml`,
   };
 }
