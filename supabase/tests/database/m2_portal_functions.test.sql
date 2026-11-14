@@ -25,6 +25,21 @@ set local search_path = extensions, public, pg_catalog;
 
 select plan(143);
 
+-- M3 aplicada? Determinado pelo histórico de migrações (C17 e I-7 valem antes
+-- e depois da M3).
+create function pg_temp.m3_applied()
+  returns boolean language plpgsql stable as $fn$
+declare
+  v_applied boolean := false;
+begin
+  if to_regclass('supabase_migrations.schema_migrations') is not null then
+    execute $q$ select exists (select 1 from supabase_migrations.schema_migrations
+                               where version = '20261113212446') $q$ into v_applied;
+  end if;
+  return v_applied;
+end
+$fn$;
+
 -- -----------------------------------------------------------------------------
 -- Utilitários de teste (temporários; revertidos com a transacção)
 -- -----------------------------------------------------------------------------
@@ -182,8 +197,14 @@ $$, 'C16/D-ACL: M1/M2 não criam nem alteram privilégios por omissão, nem os c
 select is_empty($$
   select schemaname || '.' || tablename || ':' || policyname from pg_policies
   where schemaname in ('public', 'private')
-    and roles && array['public', 'anon', 'authenticated', 'service_role']::name[]
-$$, 'C17: nenhuma política para os papéis da API (M3)');
+    and (roles && array['public', 'anon', 'service_role']::name[]
+         or ('authenticated' = any(roles)
+             and (not pg_temp.m3_applied()
+                  or schemaname <> 'public'
+                  or tablename not in ('profiles', 'accounts', 'account_members', 'user_roles', 'tickets',
+                                       'ticket_events', 'ticket_messages', 'ticket_internal_notes')
+                  or cmd not in ('SELECT', 'UPDATE'))))
+$$, 'C17: sem políticas para PUBLIC/anon/service_role; authenticated só com a M3 (SELECT/UPDATE nas 8 tabelas)');
 
 select is_empty($$
   select p.oid::regprocedure::text from pg_proc p join pg_namespace n on n.oid = p.pronamespace
@@ -606,8 +627,22 @@ $$), 'PT404', 'I-5/S2-4: cliente não lê eventos internos nem evidência');
 select is(pg_temp.try_as('authenticated', :'c_b1', $$
   select public.add_ticket_message('20000000-0000-4000-8000-00000000ffff', 'Sondagem')
 $$), 'PT404', 'I-6/T15: pedido inexistente devolve o mesmo erro que pedido alheio');
-select is(pg_temp.try_as('authenticated', :'c_a1', $$ select count(*) from public.tickets $$), '42501',
-  'I-7: sem acesso directo às tabelas (políticas da API só na M3)');
+insert into ctx select 'i7_state', pg_temp.try_as('authenticated', :'c_a1', $$
+  insert into ctx select 'i7_seen', coalesce(string_agg(id::text, ','), '') from public.tickets
+$$);
+select ok(
+  case
+    when pg_temp.m3_applied() then
+      (select v from ctx where k = 'i7_state') = 'ok'
+      and not exists (
+        select 1 from public.tickets t
+        where t.id::text = any(string_to_array((select v from ctx where k = 'i7_seen'), ','))
+          and not exists (select 1 from public.account_members m
+                          where m.account_id = t.account_id
+                            and m.user_id = '20000000-0000-4000-8000-0000000000a1'))
+    else (select v from ctx where k = 'i7_state') = '42501'
+  end,
+  'I-7: sem a M3, 42501 em leitura directa; com a M3, o cliente só vê pedidos das próprias contas');
 select is(pg_temp.try_as('authenticated', :'c_a1', $$
   select public.add_ticket_message((select v::uuid from ctx where k = 'ta'), 'Mensagem do cliente AO')
 $$), 'ok', 'I-8: cliente AO escreve no próprio pedido');

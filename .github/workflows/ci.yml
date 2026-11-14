@@ -93,7 +93,7 @@ jobs:
           mkdir -p "$RUNNER_TEMP/portal-migrations"
           mv supabase/migrations/*.sql "$RUNNER_TEMP/portal-migrations/"
           ls -1 "$RUNNER_TEMP/portal-migrations"
-          test "$(ls -1 "$RUNNER_TEMP/portal-migrations"/*.sql | wc -l)" -eq 2
+          test "$(ls -1 "$RUNNER_TEMP/portal-migrations"/*.sql | wc -l)" -eq 3
           test -z "$(ls -A supabase/migrations)"
 
       # A saída do arranque inclui chaves e credenciais locais (publishable, secret,
@@ -147,7 +147,7 @@ jobs:
             psql -U postgres -d postgres -XAtc \
             "select string_agg(version, ',' order by version) from supabase_migrations.schema_migrations")"
           echo "history=$history"
-          test "$history" = "20261113093521,20261113115533"
+          test "$history" = "20261113093521,20261113115533,20261113212446"
 
       - name: pg_default_acl unchanged by portal migrations (exact before/after)
         run: |
@@ -161,10 +161,10 @@ jobs:
           echo "Retratos idênticos: as migrações não alteraram privilégios por omissão."
 
       # Defesa dupla: código de saída (pipefail) e contagem/resultado no registo.
-      - name: pgTAP (185 assertions required)
+      - name: pgTAP (262 assertions required)
         run: |
           npx supabase test db 2>&1 | tee pgtap.log
-          grep -Eq 'Files=2, Tests=185,' pgtap.log
+          grep -Eq 'Files=3, Tests=262,' pgtap.log
           grep -Fq 'Result: PASS' pgtap.log
 
       - name: Catalog security checks (read-only)
