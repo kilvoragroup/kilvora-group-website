@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { AUTH_CALLBACK_PATH, NEW_PASSWORD_PATH } from "./auth-urls";
 import {
   decideOptimisticRoute,
   isPortalPath,
@@ -33,7 +34,13 @@ describe("isPublicPortalPath", () => {
       "/cliente/entrar",
       "/cliente/criar-conta",
       "/cliente/recuperar",
+      "/cliente/auth/confirmar",
     ]);
+    expect(publicPortalRoutes).toContain(AUTH_CALLBACK_PATH);
+    expect(isPublicPortalPath(AUTH_CALLBACK_PATH)).toBe(true);
+    // A nova palavra-passe e a área de cliente continuam protegidas.
+    expect(isPublicPortalPath(NEW_PASSWORD_PATH)).toBe(false);
+    expect(isPublicPortalPath("/cliente/auth")).toBe(false);
     expect(isPublicPortalPath("/cliente/entrar")).toBe(true);
     expect(isPublicPortalPath("/cliente/entrar/")).toBe(true);
     expect(isPublicPortalPath("/cliente/recuperar/nova")).toBe(true);

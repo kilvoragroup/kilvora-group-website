@@ -51,13 +51,32 @@ export const clientRoutes = {
 } as const;
 
 export const navActions = {
-  /** Indisponível até W3: apresentado sem ligação, com a indicação «Em breve». */
+  /**
+   * Indisponível por omissão: apresentado sem ligação, com a indicação «Em breve». Só fica
+   * disponível com o portal activo (P1), decidido no servidor em `getNavigation`.
+   */
   signIn: { label: "Entrar", href: clientRoutes.signIn, available: false },
   proposal: { label: "Solicitar proposta", href: "/contactos#proposta", available: true },
 } as const;
 
-export function getNavigation(locale: PtLocale = site.locale) {
-  return { main: resolve(mainNav, locale), actions: navActions };
+export type NavigationOptions = {
+  /**
+   * Estado do interruptor do portal (`isPortalEnabled()`), passado por um componente de
+   * servidor. Este módulo não importa `@/config/portal` porque também é usado por componentes
+   * de cliente: assim o validador da configuração Supabase não entra no bundle do navegador.
+   */
+  portalEnabled?: boolean;
+};
+
+export function getNavigation(
+  locale: PtLocale = site.locale,
+  { portalEnabled = false }: NavigationOptions = {},
+) {
+  const actions = {
+    ...navActions,
+    signIn: { ...navActions.signIn, available: portalEnabled },
+  };
+  return { main: resolve(mainNav, locale), actions };
 }
 
 export type ResolvedNavItem = ReturnType<typeof getNavigation>["main"][number];

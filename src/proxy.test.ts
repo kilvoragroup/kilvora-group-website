@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({ updateSession: vi.fn() }));
 
@@ -19,8 +19,36 @@ function sessionResult(session: { userId: string; aal: string | null } | null) {
   return { response, session };
 }
 
+// Valores FICTÍCIOS: activam o portal nos testes que exercitam o proxy.
+function enablePortal() {
+  vi.stubEnv("NEXT_PUBLIC_PORTAL_ENABLED", "true");
+  vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "http://127.0.0.1:54321");
+  vi.stubEnv("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY", "sb_publishable_ficticia_teste_000");
+}
+
 beforeEach(() => {
   mocks.updateSession.mockReset();
+  enablePortal();
+});
+
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
+
+describe("portal desligado (P1)", () => {
+  it.each([
+    ["flag ausente", () => vi.stubEnv("NEXT_PUBLIC_PORTAL_ENABLED", "")],
+    ["flag diferente de true", () => vi.stubEnv("NEXT_PUBLIC_PORTAL_ENABLED", "1")],
+    ["flag ligada sem Supabase", () => vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "")],
+  ])("%s: não inicializa o Supabase, não redirecciona nem escreve cookies", async (_l, arrange) => {
+    arrange();
+    const res = await proxy(request("/cliente/pedidos"));
+    expect(mocks.updateSession).not.toHaveBeenCalled();
+    expect(res.headers.get("x-middleware-next")).toBe("1");
+    expect(res.headers.get("location")).toBeNull();
+    expect(res.headers.get("set-cookie")).toBeNull();
+    expect(res.headers.get("cache-control")).toBeNull();
+  });
 });
 
 describe("config.matcher", () => {

@@ -16,6 +16,8 @@
 /coverage
 /test-results/
 /playwright-report/
+# Evidências dos E2E reais do portal (A2-B4): output/, report/ e evidence/
+/e2e-portal-results/
 /blob-report/
 /playwright/.cache/
 

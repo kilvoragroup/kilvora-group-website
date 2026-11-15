@@ -1,7 +1,7 @@
 # Portal V1 — M3-APP: decisões e plano de implementação
 
-**Estado:** A0, revisto em A0-R2 com a auditoria F2 (A0-R1). Este documento regista as decisões aprovadas pelo proprietário (W3-B5-04-A0). **A implementação ainda não começou.**
-**Base verificada:** `main` em `f82afea` (M1, M2 e M3-BD integradas; 262 testes pgTAP na CI).
+**Estado:** A0 aprovada; A1 integrada (`main` em `c5c7eab`, PR #12); **A2 concluída e validada localmente** na branch `feat/w3-b5-04-a2-auth`, por integrar (secção 9). Este documento regista as decisões aprovadas pelo proprietário.
+**Base verificada:** `main` em `c5c7eab` (M1, M2, M3-BD e fundação A1 integradas; 262 testes pgTAP na CI).
 **Fontes de verdade:** as migrações em [`supabase/migrations/`](../../supabase/migrations/) e os testes em [`supabase/tests/database/`](../../supabase/tests/database/). Se este documento divergir delas, prevalecem as migrações e os testes.
 
 ## 1. Decisões
@@ -53,7 +53,9 @@ Decisões anteriores que continuam em vigor:
    - `PT422`: regra de negócio;
    - `PT429`: limite;
    - `22023`: validação;
-   - `42501`: sem sessão ou sem permissão.
+   - `42501`: sem sessão ou sem permissão;
+   - `23514` e `23502`: integridade (mensagem genérica);
+   - `PGRST116`: «não encontrado» neutro; `PGRST301` e `PGRST303`: sessão expirada.
 
    Nunca se mostra sucesso antes da resposta da RPC.
 
@@ -292,3 +294,56 @@ Verificações GraphQL (A6):
    - GraphQL.
 5. Plano de ficheiros da A1 apresentado e aprovado antes da escrita: clientes, `proxy.ts`, DAL, domínio e testes.
 6. O F2 **não** bloqueia a A1 (secção 4.7). A A1 não pode incluir provisionamento de pessoal.
+
+## 9. Estado de implementação: A1 e A2
+
+### 9.1 A1 — Fundação (integrada, PR #12)
+
+Clientes Supabase de servidor, navegador e proxy (`@supabase/ssr`, só a chave publishable, cookies `Secure` excepto em HTTP de loopback); `proxy.ts` (renovação de sessão e redireccionamento optimista, nunca autorização); DAL (`requireClient` e `requireStaff`, que exige `interno`, `activo`, papel em `user_roles` e `aal2`); mapeamento de erros; esquemas Zod; tipos gerados.
+
+### 9.2 A2 — Autenticação do cliente (concluída localmente)
+
+| ID  | Decisão                                                                                                                                                                                                                                                                                 |
+| --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| P1  | Interruptor `NEXT_PUBLIC_PORTAL_ENABLED`, fixado no build e **desligado por omissão**; activo só com `"true"` e configuração Supabase válida. Desligado: navegação inalterada, `/cliente/*` com 404, proxy inerte e Server Actions recusadas.                                           |
+| P2  | Links por e-mail com PKCE e modelos por omissão; o callback aceita `code` e `token_hash`. Modelos pt-AO/pt-BR na A7.                                                                                                                                                                    |
+| P3  | E2E com o Supabase local: só `API_URL` e `PUBLISHABLE_KEY`, lidos em memória.                                                                                                                                                                                                           |
+| P4  | Limite de e-mails sem alteração: sem SMTP próprio, o limite local não se aplica.                                                                                                                                                                                                        |
+| P5  | MFA fora da A2 (A4).                                                                                                                                                                                                                                                                    |
+| P6  | Registo com `full_name`, `company` (opcional) e `locale`.                                                                                                                                                                                                                               |
+| P7  | Textos da autenticação marcados «Em validação».                                                                                                                                                                                                                                         |
+| D-A | Aceite o resíduo imutável `user_registered` (sem dados pessoais) que os E2E deixam em `private.audit_log`; o trigger de imutabilidade nunca é desactivado.                                                                                                                              |
+| D-B | Limpeza dos E2E só por `e2e-portal/sql/cleanup.sql`: manual, autorizada, numa transacção com guardas e verificações.                                                                                                                                                                    |
+| D-C | **Revista (A2-B2-R2):** a prova de recuperação é o claim `amr` `recovery` do JWT verificado (≤ 600 s, tolerância de 60 s), e não uma marca da aplicação. `require_current_password = true` no Auth impede que uma sessão normal mude a palavra-passe na API sem a palavra-passe actual. |
+| D-E | Configuração própria dos E2E do portal: `playwright.portal.config.ts`, `e2e-portal/` e evidências em `e2e-portal-results/`.                                                                                                                                                             |
+
+**Implementação:**
+
+- páginas `/cliente/entrar`, `/cliente/criar-conta`, `/cliente/recuperar`, `/cliente/nova-palavra-passe` e `/cliente` (mínima);
+- Server Actions, todas com `assertPortalEnabled()`;
+- callback `/cliente/auth/confirmar`: o fluxo é decidido pelos claims verificados e os destinos passam por `safeNext`;
+- serviços em `src/services/portal/auth.ts`, sem `redirect()`;
+- respostas neutras no registo, na entrada e na recuperação.
+
+### 9.3 Resultados finais da A2
+
+| Verificação                        | Resultado                                                                                                                           |
+| ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `npm run verify`                   | 569/569 testes unitários; typecheck, lint, Prettier e build; 19 rotas institucionais estáticas.                                     |
+| E2E institucionais                 | 38/38 (portal desligado).                                                                                                           |
+| pgTAP                              | 262/262; migrações inalteradas.                                                                                                     |
+| E2E reais do portal (B4-D)         | **12/12**: registo e confirmação, entrada e saída, sem enumeração, isolamento (S3), redireccionamentos, recuperação PKCE e cookies. |
+| API directa do GoTrue (cenário 09) | Sessão normal sem palavra-passe actual recusada: `400 current_password_required`.                                                   |
+| Recuperação PKCE (cenário 10)      | Aceite só com `amr` `recovery` verificado; a palavra-passe antiga deixa de funcionar e o link não pode ser reutilizado.             |
+| Limpeza (B4-D-R1)                  | Zero utilizadores sintéticos; REG0 intacta; estrutura idêntica; 4 resíduos imutáveis em `private.audit_log` (D-A).                  |
+
+### 9.4 Riscos residuais e pendências
+
+| Tema                    | Pendência                                                                                                                                                 | Bloqueia |
+| ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- |
+| Configuração alojada    | `require_current_password = true`, confirmações por e-mail, política de palavra-passe e URLs de redireccionamento iguais aos locais, no Supabase alojado. | A7       |
+| Domínio e URL do site   | `NEXT_PUBLIC_SITE_URL` em HTTPS e `NEXT_PUBLIC_PORTAL_ENABLED` só no ambiente autorizado. O portal continua desligado em Production até à A7/A8.          | A7/A8    |
+| Modelos de e-mail       | Modelos de autenticação em pt-AO/pt-BR (hoje em inglês) e fornecedor SMTP (D09).                                                                          | A7       |
+| Autenticação            | MFA/TOTP e consola `/interno` (A4); até lá, staff que entre recebe 404 em `/cliente`. Chaves de assinatura assimétricas ainda inactivas.                  | A4       |
+| Funcionalidades futuras | Pedidos, mensagens, conta e perfil (A3); administração e provisionamento (A5, F2).                                                                        | A3, A5   |
+| E2E                     | Só locais, fora da CI. Cada execução deixa 2 resíduos imutáveis no `audit_log`. Intervalo mínimo de 5 minutos entre execuções.                            | —        |
