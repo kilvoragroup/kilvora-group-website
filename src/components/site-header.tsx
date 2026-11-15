@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { getNavigation } from "@/config/navigation";
+import { isPortalEnabled } from "@/config/portal";
 import { site } from "@/config/site";
 import { getContent } from "@/content";
 
@@ -11,7 +12,8 @@ import { MegaMenu } from "./mega-menu";
 import { MobileNav } from "./mobile-nav";
 
 export function SiteHeader() {
-  const { main, actions } = getNavigation();
+  // Decidido no servidor (fixado no build): o interruptor não entra no bundle do navegador.
+  const { main, actions } = getNavigation(site.locale, { portalEnabled: isPortalEnabled() });
   const { common } = getContent();
 
   // Sem backdrop-filter no cabeçalho: criaria um bloco de contenção que anula o
@@ -26,14 +28,23 @@ export function SiteHeader() {
         <MegaMenu items={main} label={common.mainNavigation} overviewLabel={common.overview} />
 
         <div className="flex items-center gap-2">
-          {/* «Entrar»: área de clientes reservada para W3 — sem ligação nem autenticação. */}
-          <p className="text-muted-foreground hidden items-center gap-2 text-sm xl:flex">
-            <span>{actions.signIn.label}</span>
-            <span className="border-border rounded-full border px-2 py-0.5 text-xs">
-              {common.soon}
-            </span>
-            <span className="sr-only">{common.clientAreaSoon}</span>
-          </p>
+          {/* «Entrar»: ligação só com o portal activo (P1); caso contrário, «Em breve». */}
+          {actions.signIn.available ? (
+            <Link
+              href={actions.signIn.href}
+              className={buttonClasses("ghost", "sm", "hidden xl:inline-flex")}
+            >
+              {actions.signIn.label}
+            </Link>
+          ) : (
+            <p className="text-muted-foreground hidden items-center gap-2 text-sm xl:flex">
+              <span>{actions.signIn.label}</span>
+              <span className="border-border rounded-full border px-2 py-0.5 text-xs">
+                {common.soon}
+              </span>
+              <span className="sr-only">{common.clientAreaSoon}</span>
+            </p>
+          )}
           <Link
             href={actions.proposal.href}
             className={buttonClasses("accent", "sm", "hidden sm:inline-flex")}
@@ -43,6 +54,7 @@ export function SiteHeader() {
           <MobileNav
             items={main}
             proposalHref={actions.proposal.href}
+            signInHref={actions.signIn.available ? actions.signIn.href : undefined}
             labels={{
               navigation: common.mainNavigation,
               open: common.openMenu,

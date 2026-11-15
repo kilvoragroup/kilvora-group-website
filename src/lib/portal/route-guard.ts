@@ -8,11 +8,16 @@ import { clientRoutes } from "@/config/navigation";
  * RLS e pelas RPCs da base. Papéis, estado do perfil e `aal2` não são avaliados aqui.
  */
 
-/** Rotas do portal acessíveis sem sessão (entrada, registo e recuperação). */
+/**
+ * Rotas do portal acessíveis sem sessão: entrada, registo, recuperação e o callback dos links
+ * por e-mail (A2-B3). O callback é literal para evitar uma dependência circular com
+ * `auth-urls.ts`; um teste garante que coincide com `AUTH_CALLBACK_PATH`.
+ */
 export const publicPortalRoutes: readonly string[] = [
   clientRoutes.signIn,
   clientRoutes.signUp,
   clientRoutes.recover,
+  "/cliente/auth/confirmar",
 ];
 
 const PROTECTED_PREFIXES = ["/cliente", "/interno"] as const;

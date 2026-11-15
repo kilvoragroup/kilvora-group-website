@@ -23,12 +23,14 @@ type MobileNavProps = {
     proposal: string;
   };
   proposalHref: string;
+  /** Só definido com o portal activo (P1); ausente → «Em breve», sem ligação. */
+  signInHref?: string;
 };
 
 const FOCUSABLE = 'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 /** Menu móvel expansível e acessível (abaixo de `lg`). */
-export function MobileNav({ items, labels, proposalHref }: MobileNavProps) {
+export function MobileNav({ items, labels, proposalHref, signInHref }: MobileNavProps) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const [expanded, setExpanded] = useState<string | null>(null);
@@ -187,13 +189,23 @@ export function MobileNav({ items, labels, proposalHref }: MobileNavProps) {
           </ul>
 
           <div className="border-border mt-6 grid gap-3 border-t pt-6">
-            <p className="text-muted-foreground flex min-h-11 items-center gap-2 px-2">
-              <span>{labels.signIn}</span>
-              <span className="border-border rounded-full border px-2 py-0.5 text-xs">
-                {labels.soon}
-              </span>
-              <span className="sr-only">{labels.signInHint}</span>
-            </p>
+            {signInHref ? (
+              <Link
+                href={signInHref}
+                onNavigate={() => close()}
+                className={buttonClasses("outline", "lg", "w-full")}
+              >
+                {labels.signIn}
+              </Link>
+            ) : (
+              <p className="text-muted-foreground flex min-h-11 items-center gap-2 px-2">
+                <span>{labels.signIn}</span>
+                <span className="border-border rounded-full border px-2 py-0.5 text-xs">
+                  {labels.soon}
+                </span>
+                <span className="sr-only">{labels.signInHint}</span>
+              </p>
+            )}
             <Link
               href={proposalHref}
               onNavigate={() => close()}

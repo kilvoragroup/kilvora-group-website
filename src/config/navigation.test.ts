@@ -1,4 +1,4 @@
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
@@ -62,10 +62,17 @@ describe("navegação principal", () => {
     expect(pageExists(navActions.proposal.href.split("#")[0]!)).toBe(true);
   });
 
-  it("a área de clientes está reservada (W3): sem páginas e sem ligação activa", () => {
+  it("portal desligado por omissão: «Entrar» sem ligação activa; páginas fora da navegação pública", () => {
     expect(navActions.signIn.available).toBe(false);
+    // A2-B3: as páginas de autenticação existem, mas o layout de /cliente devolve 404 com o
+    // portal desligado e nunca entram na navegação pública nem no sitemap.
+    const layout = readFileSync(
+      fileURLToPath(new URL("../app/cliente/layout.tsx", import.meta.url)),
+      "utf8",
+    );
+    expect(layout).toMatch(/if \(!isPortalEnabled\(\)\) notFound\(\);/);
     for (const route of Object.values(clientRoutes)) {
-      expect(pageExists(route), route).toBe(false);
+      expect(pageExists(route), route).toBe(true);
       expect(publicPaths()).not.toContain(route);
     }
   });
@@ -99,5 +106,35 @@ describe("navegação contextual das áreas", () => {
       expect(ids.at(-1)).toBe("contacto");
       expect(ids.includes("relacionados")).toBe(Boolean(areas[slug].related?.length));
     }
+  });
+});
+
+describe("«Entrar» segue o interruptor do portal (P1)", () => {
+  it("por omissão → indisponível", () => {
+    expect(getNavigation("pt-AO").actions.signIn.available).toBe(false);
+    expect(getNavigation("pt-AO", {}).actions.signIn.available).toBe(false);
+  });
+
+  it("portal activo → disponível, apontando para a entrada", () => {
+    expect(getNavigation("pt-AO", { portalEnabled: true }).actions.signIn).toEqual({
+      label: "Entrar",
+      href: "/cliente/entrar",
+      available: true,
+    });
+    // Os dados estáticos não são alterados.
+    expect(navActions.signIn.available).toBe(false);
+  });
+
+  it("portal desligado → indisponível; a proposta mantém-se", () => {
+    const { actions } = getNavigation("pt-BR", { portalEnabled: false });
+    expect(actions.signIn.available).toBe(false);
+    expect(actions.proposal).toEqual(navActions.proposal);
+  });
+
+  it("navigation.ts não importa o interruptor (fica fora do bundle do navegador)", () => {
+    const source = readFileSync(fileURLToPath(new URL("./navigation.ts", import.meta.url)), "utf8");
+    expect(source).not.toMatch(
+      /^import[^;]*from "(\.\/portal|@\/config\/portal|@\/lib\/supabase[^"]*)";/m,
+    );
   });
 });
