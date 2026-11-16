@@ -1,12 +1,12 @@
 import { site } from "@/config/site";
 import { portalAuth } from "@/content/portal-auth";
-import { type LocalizedText, resolve } from "@/content/types";
+import { type Text, resolve } from "@/content/types";
 
 import type { CommonText } from "../_components/auth-forms";
 
 /** Resolve um texto para o idioma configurado no servidor. */
-export function t(value: LocalizedText): string {
-  return resolve(value, site.locale);
+export function t(value: Text): string {
+  return resolve(value, site.locale) as string;
 }
 
 export function commonText(): CommonText {

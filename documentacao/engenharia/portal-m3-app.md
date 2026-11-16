@@ -347,3 +347,27 @@ Clientes Supabase de servidor, navegador e proxy (`@supabase/ssr`, só a chave p
 | Autenticação            | MFA/TOTP e consola `/interno` (A4); até lá, staff que entre recebe 404 em `/cliente`. Chaves de assinatura assimétricas ainda inactivas.                  | A4       |
 | Funcionalidades futuras | Pedidos, mensagens, conta e perfil (A3); administração e provisionamento (A5, F2).                                                                        | A3, A5   |
 | E2E                     | Só locais, fora da CI. Cada execução deixa 2 resíduos imutáveis no `audit_log`. Intervalo mínimo de 5 minutos entre execuções.                            | —        |
+
+### 9.5 A3 — Área do cliente (implementada localmente, por integrar)
+
+Branch `feat/w3-a3-client-portal`. **Sem migrações, sem RPC nem permissões novas, sem dependências novas e sem alterações à A2** (só o tipo de `t()` foi alargado a `Text`).
+
+| Camada   | Ficheiros                                                                                                                                                                                                              |
+| -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Conteúdo | `src/content/portal-client.ts` (pt-AO/pt-BR, provisório «Em validação»; autoria do staff «Equipa KILVORA», D04).                                                                                                       |
+| Domínio  | `src/domain/portal/tickets.ts`: estados canceláveis (espelho das transições `cliente` da M2), composição do plano, validação.                                                                                          |
+| Serviço  | `src/services/portal/client-portal.ts`: leituras sob RLS com colunas explícitas; escritas por `create_ticket`, `add_ticket_message`, `change_ticket_status` (com `p_expected_status`) e UPDATE das colunas concedidas. |
+| Acções   | `src/app/cliente/portal-actions.ts`: interruptor → DAL (`checkClientAccess`) → serviço; `refresh()` só após sucesso.                                                                                                   |
+| Páginas  | `/cliente` (pedidos), `/cliente/pedidos/novo`, `/cliente/pedidos/[id]` (detalhe, mensagens, histórico, cancelamento), `/cliente/conta`.                                                                                |
+
+**Planos de website:** no tipo `desenvolvimento_websites` o cliente pode escolher Starter, Business ou Premium (ou «a definir»). O serviço grava no início da descrição um bloco com o plano e os valores lidos de `src/content/websites.ts` (180.000/350.000/650.000 Kz; manutenção 25.000/50.000/100.000 Kz/mês) e a indicação «sujeitos a confirmação comercial». O formulário nunca envia valores. Não há tabela de planos nem preço vinculativo (fotografia em texto, sem contrato de dados novo).
+
+**Segurança:** o cliente nunca envia conta, requerente nem id de conta; o isolamento é da RLS (S4, provado pelos pgTAP X2/X3 e I da M2/M3). Identificador inválido, inexistente ou alheio → o mesmo 404. Sem `evidence_ref`, notas internas, `actor_id`, `author_id`, `requester_id` nem `assigned_operator_id` na interface (S5).
+
+**`instant = false` em `/cliente/pedidos/[id]`:** rota dinâmica sem `generateStaticParams`; o cabeçalho do site lê `usePathname()` e, sem parâmetros conhecidos no build, o pré-render bloqueava (só com o portal activo).
+
+**«Não encontrado» com HTTP 200:** com Cache Components, o `notFound()` decidido em tempo de pedido corre depois de o shell ser enviado; a resposta fica 200 com a página «não encontrado» e `noindex` (docs Next: `loading.md`, «Status codes»). O isolamento exige a mesma resposta neutra para pedido alheio, inexistente e identificador inválido — verificado no E2E A3-04. Um 404 HTTP exigiria verificar acesso no proxy, o que contraria a regra 2.1 (o proxy não é barreira de autorização).
+
+**E2E A3 (S3/S4/S5): 9/9 PASS** (A3-FINAL-R3), com configuração e preparação próprias — `playwright.portal-a3.config.ts` e `e2e-portal-a3/` (`npm run test:e2e:portal:a3`, só com `E2E_PORTAL_RUN=1`); a infraestrutura E2E da A2 não foi alterada. Cenários: contas AO e BR distintas; pedido com plano de website; lista só com os próprios pedidos; acesso cruzado por URL com resposta neutra idêntica; Server Actions adulteradas (mensagem e cancelamento) recusadas; API directa (pedidos, mensagens, histórico, RPC, `evidence_ref`, notas internas); HTML e payload RSC sem campos internos; cancelamento pelo próprio; protecção de sessão e troca de utilizador no mesmo navegador.
+
+**Resíduo aceite (só base local, imutável):** cada execução deixa 2 contas sintéticas (`a3a`, `a3b`) com pedidos, eventos e mensagens que a limpeza D-B não remove. O `globalSetup` da A3 aceita só as execuções registadas em `ACCEPTED_A3_RESIDUE_RUNS` e recusa qualquer outra conta sintética; confirma também a REG0. **Consequência:** o `globalSetup` da A2 recusa arrancar enquanto existirem contas sintéticas, pelo que os E2E da A2 ficam bloqueados na base local actual até nova decisão.
