@@ -23,6 +23,24 @@ export const ACCOUNT_MEMBER_COLUMNS = "account_id, user_id, member_role, created
 export const TICKET_COLUMNS =
   "id, reference, account_id, requester_id, type, subject, description, status, assigned_operator_id, created_at, updated_at, closed_at" as const;
 
+/**
+ * Área do cliente (A3): só as colunas que a interface usa. Sem `account_id`, `requester_id` nem
+ * `assigned_operator_id` — o cliente nunca recebe identificadores de outros utilizadores.
+ */
+export const CLIENT_TICKET_LIST_COLUMNS =
+  "id, reference, type, subject, status, created_at, updated_at" as const;
+
+export const CLIENT_TICKET_DETAIL_COLUMNS =
+  "id, reference, type, subject, description, status, created_at, updated_at, closed_at" as const;
+
+/** Perfil próprio editável (A3). */
+export const PROFILE_SELF_COLUMNS = "id, full_name, phone, locale" as const;
+
+/** Associação própria (a RLS só devolve as do próprio utilizador). */
+export const MEMBERSHIP_SELF_COLUMNS = "account_id, member_role" as const;
+
+export const ACCOUNT_SELF_COLUMNS = "id, name, country, sector, status" as const;
+
 export const TICKET_MESSAGE_COLUMNS = "id, ticket_id, author_id, body, created_at" as const;
 
 export const TICKET_INTERNAL_NOTE_COLUMNS = "id, ticket_id, author_id, body, created_at" as const;
