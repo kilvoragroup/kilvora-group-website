@@ -60,7 +60,9 @@ import {
   getSession,
   getViewer,
   requireClient,
+  requireConsoleStaff,
   requireStaff,
+  requireStaffPendingMfa,
 } from "./dal";
 
 const USER = "00000000-0000-4000-8000-000000000001";
@@ -228,5 +230,50 @@ describe("requireStaff", () => {
   it("sem sessão → redirecciona para a entrada", async () => {
     state.claims = null;
     await expect(requireStaff()).rejects.toThrow("REDIRECT:/cliente/entrar");
+  });
+});
+
+describe("requireConsoleStaff e requireStaffPendingMfa (A4, S7)", () => {
+  const staff = (aal: string) => {
+    state.claims = { sub: USER, aal };
+    state.profile = { data: profileRow({ kind: "interno" }), error: null };
+    state.roles = { data: [{ role: "operador" }], error: null };
+  };
+
+  it("staff com aal2 entra na consola; a verificação TOTP devolve-o à consola", async () => {
+    staff("aal2");
+    await expect(requireConsoleStaff()).resolves.toMatchObject({ roles: ["operador"] });
+    await expect(requireStaffPendingMfa()).rejects.toThrow("REDIRECT:/interno");
+  });
+
+  it("staff sem aal2 → verificação TOTP; a página TOTP aceita-o", async () => {
+    staff("aal1");
+    await expect(requireConsoleStaff()).rejects.toThrow("REDIRECT:/interno/mfa");
+    await expect(requireStaffPendingMfa()).resolves.toMatchObject({ roles: ["operador"] });
+  });
+
+  it("sem sessão → entrada com regresso à consola", async () => {
+    state.claims = null;
+    await expect(requireConsoleStaff()).rejects.toThrow("REDIRECT:/cliente/entrar?next=%2Finterno");
+    await expect(requireStaffPendingMfa()).rejects.toThrow(
+      "REDIRECT:/cliente/entrar?next=%2Finterno%2Fmfa",
+    );
+  });
+
+  it("cliente, interno sem papel ou suspenso → «não encontrado» (sem revelar a MFA)", async () => {
+    state.claims = { sub: USER, aal: "aal2" };
+    await expect(requireConsoleStaff()).rejects.toThrow("NOT_FOUND");
+    await expect(requireStaffPendingMfa()).rejects.toThrow("NOT_FOUND");
+
+    state.profile = { data: profileRow({ kind: "interno" }), error: null };
+    state.roles = { data: [], error: null };
+    await expect(requireConsoleStaff()).rejects.toThrow("NOT_FOUND");
+    await expect(requireStaffPendingMfa()).rejects.toThrow("NOT_FOUND");
+
+    state.claims = { sub: USER, aal: "aal1" };
+    state.profile = { data: profileRow({ kind: "interno", status: "suspenso" }), error: null };
+    state.roles = { data: [{ role: "admin" }], error: null };
+    await expect(requireConsoleStaff()).rejects.toThrow("NOT_FOUND");
+    await expect(requireStaffPendingMfa()).rejects.toThrow("NOT_FOUND");
   });
 });

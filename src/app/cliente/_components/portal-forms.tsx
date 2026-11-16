@@ -23,22 +23,22 @@ import {
  * devolvido. Os textos chegam já resolvidos para o idioma.
  */
 
-const controlClasses = (error?: string) =>
+export const controlClasses = (error?: string) =>
   cx(
     "bg-background text-foreground w-full rounded-md border px-3 text-base",
     "focus-visible:ring-ring focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none",
     error ? "border-danger" : "border-input",
   );
 
-function errorsOf(state: PortalFormState) {
+export function errorsOf(state: PortalFormState) {
   return state.status === "error" ? state.fieldErrors : {};
 }
 
-function valuesOf(state: PortalFormState) {
+export function valuesOf(state: PortalFormState) {
   return state.status === "error" ? state.values : {};
 }
 
-function Message({ state, id }: { state: PortalFormState; id: string }) {
+export function Message({ state, id }: { state: PortalFormState; id: string }) {
   if (state.status === "idle") return null;
   return (
     <FormMessage
@@ -49,7 +49,7 @@ function Message({ state, id }: { state: PortalFormState; id: string }) {
   );
 }
 
-function Submit({
+export function Submit({
   label,
   pendingLabel,
   pending,
@@ -72,7 +72,7 @@ function Submit({
   );
 }
 
-function Described({
+export function Described({
   id,
   label,
   hint,
@@ -108,7 +108,7 @@ function Described({
   );
 }
 
-function TextArea({
+export function TextArea({
   id,
   name,
   label,

@@ -130,6 +130,39 @@ export async function requireClient(): Promise<Viewer> {
   return enforce(await checkClientAccess());
 }
 
+/** Caminhos da consola interna (A4). */
+export const consolePaths = { home: "/interno", mfa: "/interno/mfa" } as const;
+
+/**
+ * Exige staff para a consola (A4, portão S7): sem sessão → entrada (com regresso à consola);
+ * staff sem `aal2` → verificação TOTP; qualquer outra recusa → «não encontrado» neutro.
+ */
+export async function requireConsoleStaff(
+  allowedRoles: readonly StaffRole[] = ALL_STAFF_ROLES,
+): Promise<Viewer> {
+  const { viewer, decision } = await checkStaffAccess(allowedRoles);
+  if (decision.allowed && viewer) return viewer;
+  if (!decision.allowed && decision.reason === "unauthenticated") {
+    redirect(`${clientRoutes.signIn}?next=${encodeURIComponent(consolePaths.home)}`);
+  }
+  if (!decision.allowed && decision.reason === "mfa_required") redirect(consolePaths.mfa);
+  notFound();
+}
+
+/**
+ * Página de verificação TOTP: só para staff a quem falta apenas o `aal2`. Com `aal2` → consola;
+ * sem sessão → entrada; quem não é staff → «não encontrado».
+ */
+export async function requireStaffPendingMfa(): Promise<Viewer> {
+  const { viewer, decision } = await checkStaffAccess();
+  if (decision.allowed) redirect(consolePaths.home);
+  if (decision.reason === "unauthenticated") {
+    redirect(`${clientRoutes.signIn}?next=${encodeURIComponent(consolePaths.mfa)}`);
+  }
+  if (decision.reason === "mfa_required" && viewer) return viewer;
+  notFound();
+}
+
 /** Exige staff `interno`, activo, com um dos papéis indicados e `aal2`. */
 export async function requireStaff(
   allowedRoles: readonly StaffRole[] = ALL_STAFF_ROLES,
