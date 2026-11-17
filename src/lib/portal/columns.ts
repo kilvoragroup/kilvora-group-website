@@ -33,6 +33,14 @@ export const CLIENT_TICKET_LIST_COLUMNS =
 export const CLIENT_TICKET_DETAIL_COLUMNS =
   "id, reference, type, subject, description, status, created_at, updated_at, closed_at" as const;
 
+/** Consola interna (A4): lista sem a descrição; requerente com `phone` (Q2); conta. */
+export const STAFF_TICKET_LIST_COLUMNS =
+  "id, reference, type, subject, status, assigned_operator_id, updated_at" as const;
+
+export const STAFF_REQUESTER_COLUMNS = "id, full_name, phone" as const;
+
+export const STAFF_ACCOUNT_COLUMNS = "id, name, country, sector" as const;
+
 /** Perfil próprio editável (A3). */
 export const PROFILE_SELF_COLUMNS = "id, full_name, phone, locale" as const;
 

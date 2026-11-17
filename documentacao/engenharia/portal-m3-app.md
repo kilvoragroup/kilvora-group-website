@@ -371,3 +371,22 @@ Branch `feat/w3-a3-client-portal`. **Sem migrações, sem RPC nem permissões no
 **E2E A3 (S3/S4/S5): 9/9 PASS** (A3-FINAL-R3), com configuração e preparação próprias — `playwright.portal-a3.config.ts` e `e2e-portal-a3/` (`npm run test:e2e:portal:a3`, só com `E2E_PORTAL_RUN=1`); a infraestrutura E2E da A2 não foi alterada. Cenários: contas AO e BR distintas; pedido com plano de website; lista só com os próprios pedidos; acesso cruzado por URL com resposta neutra idêntica; Server Actions adulteradas (mensagem e cancelamento) recusadas; API directa (pedidos, mensagens, histórico, RPC, `evidence_ref`, notas internas); HTML e payload RSC sem campos internos; cancelamento pelo próprio; protecção de sessão e troca de utilizador no mesmo navegador.
 
 **Resíduo aceite (só base local, imutável):** cada execução deixa 2 contas sintéticas (`a3a`, `a3b`) com pedidos, eventos e mensagens que a limpeza D-B não remove. O `globalSetup` da A3 aceita só as execuções registadas em `ACCEPTED_A3_RESIDUE_RUNS` e recusa qualquer outra conta sintética; confirma também a REG0. **Consequência:** o `globalSetup` da A2 recusa arrancar enquanto existirem contas sintéticas, pelo que os E2E da A2 ficam bloqueados na base local actual até nova decisão.
+
+### 9.6 A4 — Consola interna e MFA (implementada localmente, E2E pendente)
+
+Branch `feat/w3-a4-operator-console`. **Sem migrações, RPC, RLS, privilégios ou dependências novas; A2 inalterada.**
+
+| Camada   | Ficheiros                                                                                                                                                                                              |
+| -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Domínio  | `src/domain/portal/staff.ts`: espelho das 16 transições `staff` da M2 (testado contra a migração), validação de transição, nota e código TOTP.                                                         |
+| Serviços | `src/services/portal/staff-console.ts` (leituras sob RLS; `evidence_ref` só por `staff_ticket_events`; RPCs da M2) e `src/services/portal/mfa.ts` (API MFA do Auth).                                   |
+| DAL      | `requireConsoleStaff` (sem `aal2` → `/interno/mfa`; não staff → 404 neutro) e `requireStaffPendingMfa`.                                                                                                |
+| Páginas  | `/interno` (atribuídos ou todos para o admin), `/interno/mfa` (inscrição e verificação TOTP), `/interno/pedidos/[id]` (requerente com `phone`, mensagens, notas, transições, histórico com evidência). |
+
+Reabertura e atribuição ficam na A5. A entrada reutiliza `/cliente/entrar?next=/interno` (A2).
+
+**E2E A4: 9/9 PASS** (A4-FINAL), numa instância Supabase LOCAL ISOLADA (`project_id = kilvora_e2e_a4`, portas 55xxx, volumes próprios, só M1–M3), sem tocar na instância principal (REG0 intacta, zero diferenças). Preparação única por `e2e-portal-a4/prepare.ts`: D13 (scripts `supabase/ops`, fases A e B) → convites pelo Auth → TOTP → `admin_provision_staff` → `grant_role('operador')`; a chave privilegiada local só existe em memória nesse processo. O op1 recebe o papel antes do TOTP (F6, sem acesso efectivo sem `aal2`) para o E2E testar a inscrição. Configuração própria: `playwright.portal-a4.config.ts` (`npm run test:e2e:portal:a4`, com `E2E_PORTAL_RUN=1` e `E2E_A4_FIXTURES`); TOTP gerado com `node:crypto` (sem dependências).
+
+Cenários: `/interno` sem sessão → entrada; cliente → «não encontrado» na consola e na MFA; atribuição pelo admin só com `aal2`; op1 sem `aal2` redireccionado para a MFA e sem dados na API; inscrição TOTP (código errado recusado) até `aal2`; transições até `aceite` com evidência obrigatória; mensagem e nota interna; op1 sem acesso ao pedido não atribuído (UI e RPC); op2 sem acesso a pedidos de outro operador; admin vê todos, notas e evidência; cliente vê o progresso e a «Equipa KILVORA», sem notas, evidência, ids de staff nem `evidence_ref` (HTML, RSC e API).
+
+**Resíduo (só na instância isolada):** 4 utilizadores sintéticos (admin, 2 operadores, 1 cliente), arranque D13, 2 pedidos com eventos, 1 mensagem, 1 nota e auditoria. A instância principal não tem arranque D13.

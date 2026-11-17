@@ -221,6 +221,21 @@ export const portalClient = {
       "O sector deve ter no máximo 80 caracteres.",
       "O setor deve ter no máximo 80 caracteres.",
     ),
+    // Consola interna (A4)
+    toStatus: v("Escolha um novo estado permitido.", "Escolha um novo status permitido."),
+    reasonRequired: v("Indique o motivo.", "Informe o motivo."),
+    evidenceRef: v(
+      "A referência da evidência pode ter no máximo 300 caracteres.",
+      "A referência da evidência pode ter no máximo 300 caracteres.",
+    ),
+    evidenceRequired: v(
+      "Indique a referência da evidência (por exemplo, o documento da proposta).",
+      "Informe a referência da evidência (por exemplo, o documento da proposta).",
+    ),
+    totp: v(
+      "Introduza o código de 6 algarismos da aplicação autenticadora.",
+      "Digite o código de 6 dígitos do aplicativo autenticador.",
+    ),
   },
 } as const;
 
