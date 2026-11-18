@@ -41,6 +41,11 @@ export const STAFF_REQUESTER_COLUMNS = "id, full_name, phone" as const;
 
 export const STAFF_ACCOUNT_COLUMNS = "id, name, country, sector" as const;
 
+/** Administração (A5): perfis e papéis activos (o admin `aal2` lê todos pela RLS da M3). */
+export const ADMIN_PROFILE_COLUMNS = "id, kind, status, full_name, created_at" as const;
+
+export const ADMIN_ROLE_COLUMNS = "user_id, role" as const;
+
 /** Perfil próprio editável (A3). */
 export const PROFILE_SELF_COLUMNS = "id, full_name, phone, locale" as const;
 

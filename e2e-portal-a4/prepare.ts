@@ -23,9 +23,10 @@ import { createHmac, randomBytes } from "node:crypto";
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-const PROJECT_ID = "kilvora_e2e_a4";
+// Instância isolada (por omissão a da A4; a A5 usa a sua própria, por variável de ambiente).
+const PROJECT_ID = process.env.E2E_ISOLATED_PROJECT_ID ?? "kilvora_e2e_a4";
 const DB_CONTAINER = `supabase_db_${PROJECT_ID}`;
-const API_URL = "http://127.0.0.1:55321";
+const API_URL = process.env.E2E_ISOLATED_API_URL ?? "http://127.0.0.1:55321";
 const DOMAIN = "e2e.example.test";
 
 function fail(message: string): never {
@@ -76,7 +77,9 @@ function readStatus(workdir: string): Status {
     serviceKey: values.get("SERVICE_ROLE_KEY") ?? "",
     mailpitUrl: values.get("MAILPIT_URL") ?? "",
   };
-  if (status.apiUrl !== API_URL) fail("a API não é a instância isolada (127.0.0.1:55321).");
+  if (status.apiUrl !== API_URL || !API_URL.startsWith("http://127.0.0.1:")) {
+    fail("a API não é a instância isolada indicada (loopback).");
+  }
   if (!/^sb_publishable_/.test(status.publishableKey) || !status.serviceKey) {
     fail("chaves locais em falta.");
   }

@@ -40,6 +40,12 @@ begin
 end
 $fn$;
 
+-- M4-BD aplicada? (mitigação F2: tabela de factos de convite e 2 RPCs administrativas)
+create function pg_temp.m4_applied()
+  returns boolean language sql stable as $fn$
+  select to_regclass('private.auth_invite_facts') is not null
+$fn$;
+
 -- -----------------------------------------------------------------------------
 -- Utilitários de teste (temporários; revertidos com a transacção)
 -- -----------------------------------------------------------------------------
@@ -100,8 +106,9 @@ select is_empty($$
 $$, 'C3: nenhum papel da API pode assumir os papéis do portal');
 
 select set_eq($$ select p.proname::text from pg_proc p where pg_get_userbyid(p.proowner) = 'portal_registrar' $$,
-  array['handle_new_user', 'mark_user_invited'],
-  'C4/S1-1: portal_registrar é dono exactamente das 2 funções de trigger de registo');
+  case when pg_temp.m4_applied() then array['handle_new_user', 'mark_user_invited', 'record_auth_invite']
+       else array['handle_new_user', 'mark_user_invited'] end,
+  'C4/S1-1: portal_registrar é dono exactamente das 2 funções de trigger de registo (+ record_auth_invite com a M4)');
 
 select set_eq($$ select p.proname::text from pg_proc p where pg_get_userbyid(p.proowner) = 'portal_guard' $$,
   array['is_staff', 'is_admin', 'is_account_member', 'is_account_owner', 'is_assigned', 'can_view_ticket'],
@@ -111,8 +118,11 @@ select set_eq($$ select p.proname::text from pg_proc p where pg_get_userbyid(p.p
   array['require_user', 'write_audit', 'next_ticket_reference', 'create_ticket', 'add_ticket_message',
         'add_internal_note', 'change_ticket_status', 'reopen_ticket', 'assign_ticket', 'grant_role',
         'revoke_role', 'admin_provision_staff', 'admin_cancel_staff_provisioning',
-        'admin_set_profile_status', 'admin_audit_log', 'staff_ticket_events'],
-  'C6/G2: portal_definer é dono exactamente das 13 RPCs e 3 funções internas');
+        'admin_set_profile_status', 'admin_audit_log', 'staff_ticket_events']
+  || case when pg_temp.m4_applied()
+          then array['admin_remove_misclassified_registration', 'admin_staff_provisioning_status']
+          else array[]::text[] end,
+  'C6/G2: portal_definer é dono exactamente das 13 RPCs e 3 funções internas (+ 2 RPCs F2 com a M4)');
 
 select is_empty($$
   select p.oid::regprocedure::text from pg_proc p join pg_namespace n on n.oid = p.pronamespace
@@ -140,7 +150,10 @@ $$, array['jwt_claims', 'jwt_sub', 'jwt_aal', 'jwt_role',
           'is_staff', 'is_admin', 'is_account_member', 'is_account_owner', 'is_assigned', 'can_view_ticket',
           'create_ticket', 'add_ticket_message', 'add_internal_note', 'change_ticket_status', 'reopen_ticket',
           'assign_ticket', 'grant_role', 'revoke_role', 'admin_provision_staff', 'admin_cancel_staff_provisioning',
-          'admin_set_profile_status', 'admin_audit_log', 'staff_ticket_events'],
+          'admin_set_profile_status', 'admin_audit_log', 'staff_ticket_events']
+  || case when pg_temp.m4_applied()
+          then array['admin_remove_misclassified_registration', 'admin_staff_provisioning_status']
+          else array[]::text[] end,
   'C10: authenticated executa exactamente as funções aprovadas');
 
 select is_empty($$
@@ -163,8 +176,9 @@ select is_empty($$
 $$, 'C13/R-ROLE5: papéis do portal sem privilégios em tabelas do esquema auth');
 
 select set_eq($$ select tgname::text from pg_trigger where tgrelid = 'auth.users'::regclass and not tgisinternal $$,
-  array['auth_user_created', 'auth_user_invited'],
-  'C14/S1-2: auth.users tem exactamente os 2 triggers de registo');
+  case when pg_temp.m4_applied() then array['auth_user_created', 'auth_user_invited', 'auth_user_invite_fact']
+       else array['auth_user_created', 'auth_user_invited'] end,
+  'C14/S1-2: auth.users tem exactamente os 2 triggers de registo (+ auth_user_invite_fact com a M4)');
 
 select ok(
   (select tgdeferrable and tginitdeferred from pg_trigger
@@ -210,7 +224,11 @@ select is_empty($$
   select p.oid::regprocedure::text from pg_proc p join pg_namespace n on n.oid = p.pronamespace
   where n.nspname in ('public', 'private') and p.prosrc ilike '%set_config%'
     and pg_get_userbyid(p.proowner) <> 'portal_registrar'
-$$, 'C18/REG-SC: set_config só existe nas funções do portal_registrar');
+    -- M4-BD: a correcção F2 marca só kilvora.f2_target (nunca as variáveis kilvora.signup_*).
+    and not (pg_temp.m4_applied()
+             and n.nspname = 'public' and p.proname = 'admin_remove_misclassified_registration'
+             and p.prosrc not ilike '%signup%')
+$$, 'C18/REG-SC: set_config só existe nas funções do portal_registrar (excepto a marcação F2 da M4)');
 
 select set_eq($$
   select column_name::text from information_schema.column_privileges

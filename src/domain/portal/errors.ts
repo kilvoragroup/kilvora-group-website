@@ -37,7 +37,26 @@ export type PortalErrorReason =
   | "invalid_description"
   | "invalid_body"
   | "invalid_reason"
-  | "invalid_evidence_ref";
+  | "invalid_evidence_ref"
+  // Administração (A5)
+  | "invalid_operator"
+  | "invalid_target"
+  | "role_already_active"
+  | "self_grant_forbidden"
+  | "self_revoke_forbidden"
+  | "self_status_change_forbidden"
+  | "last_admin"
+  | "invalid_email"
+  | "already_provisioned"
+  | "status_not_supported"
+  | "profile_anonymised"
+  // Mitigação F2 (M4-BD)
+  | "not_eligible"
+  | "not_invited"
+  | "provisioning_mismatch"
+  | "has_activity"
+  | "self_action_forbidden"
+  | "concurrent_change";
 
 export type PortalError = {
   readonly kind: PortalErrorKind;
@@ -178,6 +197,110 @@ const REASONS: Readonly<
     message: v(
       "A referência da evidência pode ter no máximo 300 caracteres.",
       "A referência da evidência pode ter no máximo 300 caracteres.",
+    ),
+  },
+  invalid_operator: {
+    code: "22023",
+    message: v(
+      "Escolha um operador activo (o requerente não pode ser o operador).",
+      "Escolha um operador ativo (o solicitante não pode ser o operador).",
+    ),
+  },
+  invalid_target: {
+    code: "22023",
+    message: v(
+      "O papel só pode ser dado a um perfil interno activo.",
+      "O papel só pode ser dado a um perfil interno ativo.",
+    ),
+  },
+  role_already_active: {
+    code: "PT409",
+    message: v("Este papel já está activo.", "Este papel já está ativo."),
+  },
+  self_grant_forbidden: {
+    code: "42501",
+    message: v("Não pode dar papéis a si próprio.", "Você não pode dar papéis a si mesmo."),
+  },
+  self_revoke_forbidden: {
+    code: "42501",
+    message: v(
+      "Não pode retirar os seus próprios papéis.",
+      "Você não pode retirar seus próprios papéis.",
+    ),
+  },
+  self_status_change_forbidden: {
+    code: "42501",
+    message: v(
+      "Não pode alterar o estado do seu próprio perfil.",
+      "Você não pode alterar o status do seu próprio perfil.",
+    ),
+  },
+  last_admin: {
+    code: "PT409",
+    message: v(
+      "Tem de existir pelo menos um administrador activo.",
+      "Deve existir pelo menos um administrador ativo.",
+    ),
+  },
+  invalid_email: {
+    code: "22023",
+    message: v("Indique um e-mail válido.", "Informe um e-mail válido."),
+  },
+  already_provisioned: {
+    code: "PT409",
+    message: v(
+      "Já existe um provisionamento pendente para este e-mail.",
+      "Já existe um provisionamento pendente para este e-mail.",
+    ),
+  },
+  status_not_supported: {
+    code: "22023",
+    message: v("Estado não suportado.", "Status não suportado."),
+  },
+  profile_anonymised: {
+    code: "PT409",
+    message: v("Este perfil foi anonimizado.", "Este perfil foi anonimizado."),
+  },
+  not_eligible: {
+    code: "PT422",
+    message: v(
+      "Só um cliente SUSPENSO, registado há menos de 24 horas, pode ser corrigido.",
+      "Só um cliente SUSPENSO, registrado há menos de 24 horas, pode ser corrigido.",
+    ),
+  },
+  not_invited: {
+    code: "PT422",
+    message: v(
+      "Este registo não foi feito por convite: não é um caso F2.",
+      "Este registro não foi feito por convite: não é um caso F2.",
+    ),
+  },
+  provisioning_mismatch: {
+    code: "PT422",
+    message: v(
+      "O provisionamento indicado não corresponde (tem de ser seu, não consumido e anterior ao registo, até 7 dias).",
+      "O provisionamento informado não corresponde (deve ser seu, não consumido e anterior ao registro, até 7 dias).",
+    ),
+  },
+  has_activity: {
+    code: "PT409",
+    message: v(
+      "O registo já tem actividade ou outros membros e não pode ser removido.",
+      "O registro já tem atividade ou outros membros e não pode ser removido.",
+    ),
+  },
+  self_action_forbidden: {
+    code: "42501",
+    message: v(
+      "Não pode aplicar esta operação a si próprio.",
+      "Você não pode aplicar esta operação a si mesmo.",
+    ),
+  },
+  concurrent_change: {
+    code: "PT409",
+    message: v(
+      "O registo foi alterado entretanto. Actualize a página e tente novamente.",
+      "O registro foi alterado nesse meio-tempo. Atualize a página e tente novamente.",
     ),
   },
 };

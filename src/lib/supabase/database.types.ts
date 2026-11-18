@@ -401,9 +401,25 @@ export type Database = {
       };
       admin_cancel_staff_provisioning: { Args: { p_provisioning_id: number }; Returns: undefined };
       admin_provision_staff: { Args: { p_email: string }; Returns: number };
+      admin_remove_misclassified_registration: {
+        Args: { p_provisioning_id: number; p_user_id: string };
+        Returns: Json;
+      };
       admin_set_profile_status: {
         Args: { p_status: Database["public"]["Enums"]["profile_status"]; p_user_id: string };
         Returns: undefined;
+      };
+      admin_staff_provisioning_status: {
+        Args: { p_provisioning_id: number };
+        Returns: {
+          consumed_user_id: string;
+          created_at: string;
+          email_masked: string;
+          expires_at: string;
+          id: number;
+          provisioned_by_me: boolean;
+          state: string;
+        }[];
       };
       assign_ticket: { Args: { p_operator_id?: string; p_ticket_id: string }; Returns: Json };
       change_ticket_status: {

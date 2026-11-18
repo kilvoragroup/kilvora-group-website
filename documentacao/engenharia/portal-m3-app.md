@@ -390,3 +390,21 @@ Reabertura e atribuição ficam na A5. A entrada reutiliza `/cliente/entrar?next
 Cenários: `/interno` sem sessão → entrada; cliente → «não encontrado» na consola e na MFA; atribuição pelo admin só com `aal2`; op1 sem `aal2` redireccionado para a MFA e sem dados na API; inscrição TOTP (código errado recusado) até `aal2`; transições até `aceite` com evidência obrigatória; mensagem e nota interna; op1 sem acesso ao pedido não atribuído (UI e RPC); op2 sem acesso a pedidos de outro operador; admin vê todos, notas e evidência; cliente vê o progresso e a «Equipa KILVORA», sem notas, evidência, ids de staff nem `evidence_ref` (HTML, RSC e API).
 
 **Resíduo (só na instância isolada):** 4 utilizadores sintéticos (admin, 2 operadores, 1 cliente), arranque D13, 2 pedidos com eventos, 1 mensagem, 1 nota e auditoria. A instância principal não tem arranque D13.
+
+### 9.7 A5 — Administração (implementada localmente, por integrar)
+
+Branch `feat/w3-a5-admin`. **Sem migrações, RPC, RLS, privilégios ou dependências novas; A1–A4 reutilizadas** (acréscimos: motivos de erro das RPCs administrativas em `errors.ts`, `assignedOperatorId` no detalhe da consola, instância isolada parametrizável nos auxiliares E2E da A4).
+
+| Funcionalidade  | Implementação                                                                                                                                                                                                                                       |
+| --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Equipa          | `/interno/admin`: perfis internos com papéis activos; dar papel (`grant_role`), retirar (`revoke_role`, com desatribuição automática dos pedidos do operador), suspender/reactivar (`admin_set_profile_status`). Sem acções sobre o próprio perfil. |
+| Clientes        | Mesma página: suspender/reactivar (contenção F2, secção 4.5).                                                                                                                                                                                       |
+| Provisionamento | `admin_provision_staff` (mostra o `id` a guardar, L2) e `admin_cancel_staff_provisioning`, com o aviso F2 e o procedimento da secção 4.2. O convite continua manual no Dashboard (D01).                                                             |
+| Pedidos         | No detalhe da consola, só para o admin: atribuição/reatribuição/retirada (`assign_ticket`) e reabertura com motivo (`reopen_ticket`, D12).                                                                                                          |
+| Auditoria       | `/interno/admin/auditoria`: `admin_audit_log` (100 entradas), filtro por tipo de entidade (lista da M2) e identificador.                                                                                                                            |
+
+Todas as acções: interruptor → DAL `checkStaffAccess(["admin"])` (operador → recusa neutra; sem `aal2` → MFA) → RPC da M2 (admin `aal2`, auto-acção e último admin recusados, auditoria na mesma transacção).
+
+**E2E A5: 9/9 PASS** numa instância Supabase local isolada própria (`kilvora_e2e_a5`, portas 56xxx), preparada com `e2e-portal-a4/prepare.ts` (`E2E_ISOLATED_PROJECT_ID`, `E2E_ISOLATED_API_URL`); configuração `playwright.portal-a5.config.ts` (`npm run test:e2e:portal:a5`). Base principal sem diferenças e REG0 intacta.
+
+**F2 (secção 4.7):** a A5 inclui o provisionamento de pessoal. A integração e qualquer provisionamento real exigem a decisão do proprietário: aceitação escrita do risco F2 ou aprovação da M4-BD (secção 4.6).

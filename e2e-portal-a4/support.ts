@@ -9,9 +9,9 @@ import { join } from "node:path";
  * privilegiadas. Consultas à base só em leitura, no contentor isolado.
  */
 
-export const A4_PROJECT_ID = "kilvora_e2e_a4";
+export const A4_PROJECT_ID = process.env.E2E_ISOLATED_PROJECT_ID ?? "kilvora_e2e_a4";
 export const A4_DB_CONTAINER = `supabase_db_${A4_PROJECT_ID}`;
-export const A4_API_URL = "http://127.0.0.1:55321";
+export const A4_API_URL = process.env.E2E_ISOLATED_API_URL ?? "http://127.0.0.1:55321";
 export const MAIN_DB_CONTAINER = "supabase_db_Kilvora_Group_Website";
 
 export type StaffFixture = {
@@ -37,7 +37,9 @@ export function loadFixtures(): A4Fixtures {
     throw new Error("E2E A4: fixtures em falta (executar primeiro e2e-portal-a4/prepare.ts).");
   }
   const fixtures = JSON.parse(readFileSync(file, "utf8")) as A4Fixtures;
-  if (fixtures.apiUrl !== A4_API_URL) throw new Error("E2E A4: a API não é a instância isolada.");
+  if (fixtures.apiUrl !== A4_API_URL || !A4_API_URL.startsWith("http://127.0.0.1:")) {
+    throw new Error("E2E A4: a API não é a instância isolada.");
+  }
   if (!/^sb_publishable_/.test(fixtures.publishableKey)) {
     throw new Error("E2E A4: só a chave publishable é aceite.");
   }

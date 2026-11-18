@@ -24,6 +24,15 @@ Garantias aplicadas pela base de dados (M2): no máximo um arranque (`private.sy
 
 Depois do arranque, provisionar logo um segundo admin pela aplicação: não existe segundo arranque.
 
+## F2 — utilizadores do Auth sem perfil (M4-BD, C5)
+
+`f2_auth_orphans_status.sql` — **só leitura** (transacção `READ ONLY`). Depois de `admin_remove_misclassified_registration` (consola `/interno/admin`), lista os utilizadores do Auth que ficaram sem perfil e a acção pendente no Dashboard (bloquear e apagar). Sem e-mail nem nome; identificador mascarado.
+
+```powershell
+Get-Content -Encoding UTF8 supabase\ops\f2_auth_orphans_status.sql |
+  docker exec -i supabase_db_Kilvora_Group_Website psql -U postgres -d postgres -X -v ON_ERROR_STOP=1 -f -
+```
+
 ## Regras de operação
 
 - Proibido `supabase db reset --linked` / `--db-url` nos ambientes do portal: os papéis do cluster sobrevivem e a M1 recusa adoptá-los (O1).
