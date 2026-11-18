@@ -12,6 +12,7 @@ import { portalStaff } from "@/content/portal-staff";
 import { staffTransitionsFrom } from "@/domain/portal/staff";
 import { formatDateTime, isClosedStatus } from "@/domain/portal/tickets";
 import { consolePaths, requireConsoleStaff } from "@/lib/portal/dal";
+import { listActiveOperators } from "@/services/portal/admin";
 import { type StaffEvent, getStaffTicket } from "@/services/portal/staff-console";
 
 import { Loading } from "../../../cliente/_components/auth-shell";
@@ -22,6 +23,7 @@ import {
   StaffMessageForm,
   TransitionForm,
 } from "../../_components/console-forms";
+import { AssignForm, ReopenForm } from "../../_components/admin-forms";
 import { ConsoleShell } from "../../_components/console-shell";
 
 export const metadata: Metadata = { title: t(portalStaff.home.title) };
@@ -79,6 +81,10 @@ async function StaffTicket({ params }: { params: Params }) {
   const sending = t(portalAuth.common.sending);
   const missing = t(s.notProvided);
   const transitions = staffTransitionsFrom(ticket.status);
+  // Administração (A5): atribuição e reabertura só para o admin (a RPC volta a exigi-lo).
+  const isAdmin = viewer.roles.includes("admin");
+  const operators = isAdmin && !closed ? await listActiveOperators() : null;
+  const a = portalStaff.admin;
 
   return (
     <ConsoleShell title={ticket.subject}>
@@ -131,7 +137,54 @@ async function StaffTicket({ params }: { params: Params }) {
           </p>
         </section>
 
-        {closed ? (
+        {isAdmin && operators && (
+          <section
+            aria-labelledby="admin-atribuicao"
+            className="border-border grid gap-3 rounded-xl border p-6"
+          >
+            <h2 id="admin-atribuicao" className="text-lg font-semibold">
+              {t(a.assignTitle)}
+            </h2>
+            {operators.ok ? (
+              <AssignForm
+                ticketId={ticket.id}
+                currentOperatorId={ticket.assignedOperatorId}
+                operators={operators.value.map((operator) => ({
+                  id: operator.id,
+                  label: operator.name ?? operator.id,
+                }))}
+                text={{
+                  operator: t(a.operator),
+                  none: t(a.noOperator),
+                  submit: t(a.assign),
+                  sending,
+                }}
+              />
+            ) : (
+              <FormMessage tone="error" message={t(operators.error.message)} />
+            )}
+          </section>
+        )}
+
+        {closed && isAdmin ? (
+          <section
+            aria-labelledby="admin-reabrir"
+            className="border-border grid gap-3 rounded-xl border p-6"
+          >
+            <h2 id="admin-reabrir" className="text-lg font-semibold">
+              {t(a.reopenTitle)}
+            </h2>
+            <ReopenForm
+              ticketId={ticket.id}
+              text={{
+                reason: t(a.reopenReason),
+                hint: t(a.reopenHint),
+                submit: t(a.reopen),
+                sending,
+              }}
+            />
+          </section>
+        ) : closed ? (
           <p className="text-muted-foreground text-sm">{t(s.closed)}</p>
         ) : (
           <section

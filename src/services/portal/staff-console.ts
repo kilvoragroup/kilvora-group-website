@@ -104,6 +104,8 @@ export type StaffTicketDetail = {
   readonly status: TicketStatus;
   readonly createdAt: string;
   readonly closedAt: string | null;
+  /** Operador atribuído (o admin precisa dele para a reatribuição, A5). */
+  readonly assignedOperatorId: string | null;
   readonly requester: { name: string | null; phone: string | null } | null;
   readonly account: { name: string; country: string | null; sector: string | null } | null;
   readonly messages: readonly StaffMessage[];
@@ -191,6 +193,7 @@ export async function getStaffTicket(
     status: ticket.status,
     createdAt: ticket.created_at,
     closedAt: ticket.closed_at,
+    assignedOperatorId: ticket.assigned_operator_id,
     requester: requester.data
       ? { name: requester.data.full_name, phone: requester.data.phone }
       : null,

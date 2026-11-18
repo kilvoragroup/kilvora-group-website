@@ -44,6 +44,22 @@ async function StaffTickets() {
   return (
     <div className="grid gap-6">
       <p className="text-muted-foreground">{t(isAdmin ? s.introAdmin : s.introOperator)}</p>
+      {isAdmin && (
+        <nav aria-label={t(portalStaff.admin.navAdmin)} className="flex flex-wrap gap-4 text-sm">
+          <Link
+            href="/interno/admin"
+            className="text-primary font-semibold underline-offset-4 hover:underline"
+          >
+            {t(portalStaff.admin.navAdmin)}
+          </Link>
+          <Link
+            href="/interno/admin/auditoria"
+            className="text-primary font-semibold underline-offset-4 hover:underline"
+          >
+            {t(portalStaff.admin.navAudit)}
+          </Link>
+        </nav>
+      )}
       {!result.ok ? (
         <FormMessage tone="error" message={t(result.error.message)} />
       ) : result.value.length === 0 ? (

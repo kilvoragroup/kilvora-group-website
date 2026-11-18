@@ -232,6 +232,15 @@ export const portalClient = {
       "Indique a referência da evidência (por exemplo, o documento da proposta).",
       "Informe a referência da evidência (por exemplo, o documento da proposta).",
     ),
+    // Administração (A5)
+    operator: v("Escolha um operador válido.", "Escolha um operador válido."),
+    role: v("Escolha um papel válido.", "Escolha uma função válida."),
+    status: v("Escolha um estado válido.", "Escolha um status válido."),
+    email: v("Indique um e-mail válido.", "Informe um e-mail válido."),
+    provisioningId: v(
+      "Indique o número do provisionamento.",
+      "Informe o número do provisionamento.",
+    ),
     totp: v(
       "Introduza o código de 6 algarismos da aplicação autenticadora.",
       "Digite o código de 6 dígitos do aplicativo autenticador.",

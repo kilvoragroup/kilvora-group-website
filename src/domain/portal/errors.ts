@@ -37,7 +37,19 @@ export type PortalErrorReason =
   | "invalid_description"
   | "invalid_body"
   | "invalid_reason"
-  | "invalid_evidence_ref";
+  | "invalid_evidence_ref"
+  // Administração (A5)
+  | "invalid_operator"
+  | "invalid_target"
+  | "role_already_active"
+  | "self_grant_forbidden"
+  | "self_revoke_forbidden"
+  | "self_status_change_forbidden"
+  | "last_admin"
+  | "invalid_email"
+  | "already_provisioned"
+  | "status_not_supported"
+  | "profile_anonymised";
 
 export type PortalError = {
   readonly kind: PortalErrorKind;
@@ -179,6 +191,68 @@ const REASONS: Readonly<
       "A referência da evidência pode ter no máximo 300 caracteres.",
       "A referência da evidência pode ter no máximo 300 caracteres.",
     ),
+  },
+  invalid_operator: {
+    code: "22023",
+    message: v(
+      "Escolha um operador activo (o requerente não pode ser o operador).",
+      "Escolha um operador ativo (o solicitante não pode ser o operador).",
+    ),
+  },
+  invalid_target: {
+    code: "22023",
+    message: v(
+      "O papel só pode ser dado a um perfil interno activo.",
+      "O papel só pode ser dado a um perfil interno ativo.",
+    ),
+  },
+  role_already_active: {
+    code: "PT409",
+    message: v("Este papel já está activo.", "Este papel já está ativo."),
+  },
+  self_grant_forbidden: {
+    code: "42501",
+    message: v("Não pode dar papéis a si próprio.", "Você não pode dar papéis a si mesmo."),
+  },
+  self_revoke_forbidden: {
+    code: "42501",
+    message: v(
+      "Não pode retirar os seus próprios papéis.",
+      "Você não pode retirar seus próprios papéis.",
+    ),
+  },
+  self_status_change_forbidden: {
+    code: "42501",
+    message: v(
+      "Não pode alterar o estado do seu próprio perfil.",
+      "Você não pode alterar o status do seu próprio perfil.",
+    ),
+  },
+  last_admin: {
+    code: "PT409",
+    message: v(
+      "Tem de existir pelo menos um administrador activo.",
+      "Deve existir pelo menos um administrador ativo.",
+    ),
+  },
+  invalid_email: {
+    code: "22023",
+    message: v("Indique um e-mail válido.", "Informe um e-mail válido."),
+  },
+  already_provisioned: {
+    code: "PT409",
+    message: v(
+      "Já existe um provisionamento pendente para este e-mail.",
+      "Já existe um provisionamento pendente para este e-mail.",
+    ),
+  },
+  status_not_supported: {
+    code: "22023",
+    message: v("Estado não suportado.", "Status não suportado."),
+  },
+  profile_anonymised: {
+    code: "PT409",
+    message: v("Este perfil foi anonimizado.", "Este perfil foi anonimizado."),
   },
 };
 
