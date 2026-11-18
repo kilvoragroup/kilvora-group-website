@@ -408,3 +408,13 @@ Todas as acções: interruptor → DAL `checkStaffAccess(["admin"])` (operador �
 **E2E A5: 9/9 PASS** numa instância Supabase local isolada própria (`kilvora_e2e_a5`, portas 56xxx), preparada com `e2e-portal-a4/prepare.ts` (`E2E_ISOLATED_PROJECT_ID`, `E2E_ISOLATED_API_URL`); configuração `playwright.portal-a5.config.ts` (`npm run test:e2e:portal:a5`). Base principal sem diferenças e REG0 intacta.
 
 **F2 (secção 4.7):** a A5 inclui o provisionamento de pessoal. A integração e qualquer provisionamento real exigem a decisão do proprietário: aceitação escrita do risco F2 ou aprovação da M4-BD (secção 4.6).
+
+### 9.8 A6 — Endurecimento (implementado localmente) e GraphQL (pendente de autorização)
+
+**Endurecimento:** cabeçalhos em todas as rotas, por `next.config.ts` `headers()` e `src/config/security-headers.ts` (função pura e testada).
+
+- **CSP sem nonces** (Next.js 16, «Without Nonces»): com `cacheComponents`, os shells pré-renderizados não recebem nonce, por isso o site admite `'unsafe-inline'` em `script-src` e `style-src`. Tudo o resto fica na própria origem: `img-src` com `data:` para o QR TOTP, `frame-ancestors`, `frame-src` e `object-src` a `'none'`, `base-uri` e `form-action` a `'self'`, e `upgrade-insecure-requests`. `'unsafe-eval'` só existe em desenvolvimento e `https://vercel.live` só em Preview.
+- **Outros cabeçalhos:** `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy` restritiva e `Cross-Origin-Opener-Policy: same-origin`. O HSTS continua a ser enviado pela Vercel.
+- **Verificação local** (build com o portal activo numa instância Supabase isolada): 19 páginas, institucionais e do portal, sem violações de CSP, sem erros de página e com hidratação activa; a Server Action de entrada funciona com `form-action 'self'`.
+
+**GraphQL (G1–G8):** o `pg_graphql` **não está instalado**, nem localmente nem na homologação (verificado em leitura; só existe o esqueleto `graphql_public.graphql`). A validação G1–G8 exige activá-lo numa instância local isolada, e isso precisa da autorização específica prevista na A6. Até lá, o portão GQL fica pendente.
