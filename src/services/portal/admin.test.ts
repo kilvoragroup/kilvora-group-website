@@ -43,9 +43,11 @@ import {
   cancelProvisioning,
   changeRole,
   getAuditLog,
+  getProvisioningStatus,
   listActiveOperators,
   listProfiles,
   provisionStaff,
+  removeMisclassifiedRegistration,
   reopenTicket,
   setProfileStatus,
 } from "./admin";
@@ -186,5 +188,64 @@ describe("administração: RPCs da M2", () => {
       fn: "admin_audit_log",
       args: { p_entity_type: "ticket", p_limit: 100 },
     });
+  });
+});
+
+describe("mitigação F2 (M4-BD)", () => {
+  it("correcção: argumentos exactos; só sucesso com { removed: true }", async () => {
+    fake.rpcResults.admin_remove_misclassified_registration = {
+      data: { user_id: OP, removed: true },
+      error: null,
+    };
+    expect(
+      await removeMisclassifiedRegistration({ userId: OP, provisioningId: "9", confirm: "sim" }),
+    ).toEqual({ ok: true, value: true });
+    expect(fake.rpcCalls[0]).toEqual({
+      fn: "admin_remove_misclassified_registration",
+      args: { p_user_id: OP, p_provisioning_id: 9 },
+    });
+    fake.rpcResults.admin_remove_misclassified_registration = { data: {}, error: null };
+    expect(
+      await removeMisclassifiedRegistration({ userId: OP, provisioningId: "9", confirm: "sim" }),
+    ).toMatchObject({ ok: false, error: { kind: "unexpected" } });
+  });
+
+  it("correcção sem confirmação → nenhuma RPC; erro da base com motivo", async () => {
+    expect(
+      await removeMisclassifiedRegistration({ userId: OP, provisioningId: "9" }),
+    ).toMatchObject({
+      ok: false,
+      issues: { confirm: "confirm" },
+    });
+    expect(fake.factoryCalls).toBe(0);
+    fake.rpcResults.admin_remove_misclassified_registration = {
+      data: null,
+      error: { code: "PT422", message: "not_eligible" },
+    };
+    expect(
+      await removeMisclassifiedRegistration({ userId: OP, provisioningId: "9", confirm: "sim" }),
+    ).toMatchObject({ ok: false, error: { reason: "not_eligible" } });
+  });
+
+  it("estado do provisionamento: estados fechados", async () => {
+    const row = {
+      id: 9,
+      state: "pendente",
+      email_masked: "n***@example.test",
+      created_at: T0,
+      expires_at: T0,
+      consumed_user_id: null,
+      provisioned_by_me: true,
+    };
+    fake.rpcResults.admin_staff_provisioning_status = { data: [row], error: null };
+    expect(await getProvisioningStatus({ provisioningId: "9" })).toMatchObject({
+      ok: true,
+      value: { state: "pendente", emailMasked: "n***@example.test", provisionedByMe: true },
+    });
+    fake.rpcResults.admin_staff_provisioning_status = {
+      data: [{ ...row, state: "outro" }],
+      error: null,
+    };
+    expect(await getProvisioningStatus({ provisioningId: "9" })).toMatchObject({ ok: false });
   });
 });

@@ -15,7 +15,9 @@ import {
   assignTicket,
   cancelProvisioning,
   changeRole,
+  getProvisioningStatus,
   provisionStaff,
+  removeMisclassifiedRegistration,
   reopenTicket,
   setProfileStatus,
 } from "@/services/portal/admin";
@@ -101,4 +103,27 @@ export async function provisionAction(_p: PortalFormState, formData: FormData) {
 
 export async function cancelProvisioningAction(_p: PortalFormState, formData: FormData) {
   return run(formData, ["provisioningId"], cancelProvisioning, () => text(a.cancelled));
+}
+
+export async function provisioningStatusAction(_p: PortalFormState, formData: FormData) {
+  return run(formData, ["provisioningId"], getProvisioningStatus, (value) =>
+    [
+      `#${value.id}`,
+      text(a.f2States[value.state]),
+      value.emailMasked,
+      value.provisionedByMe ? text(a.f2Mine) : text(a.f2NotMine),
+      value.consumedUserId ? `${text(a.f2ConsumedBy)} ${value.consumedUserId}` : "",
+    ]
+      .filter(Boolean)
+      .join(" · "),
+  );
+}
+
+export async function removeMisclassifiedAction(_p: PortalFormState, formData: FormData) {
+  return run(
+    formData,
+    ["userId", "provisioningId", "confirm"],
+    removeMisclassifiedRegistration,
+    () => text(a.f2Removed),
+  );
 }

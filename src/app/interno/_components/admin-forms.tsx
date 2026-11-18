@@ -20,6 +20,8 @@ import {
   assignAction,
   cancelProvisioningAction,
   provisionAction,
+  provisioningStatusAction,
+  removeMisclassifiedAction,
   reopenAction,
   roleAction,
   statusAction,
@@ -246,6 +248,106 @@ export function CancelProvisioningForm({
           pending={pending}
           variant="outline"
         />
+      </div>
+    </form>
+  );
+}
+
+export function ProvisioningLookupForm({
+  text,
+}: {
+  text: { id: string; submit: string; sending: string };
+}) {
+  const [state, action, pending] = useActionState(provisioningStatusAction, PORTAL_IDLE);
+  const errors = errorsOf(state);
+  return (
+    <form
+      action={action}
+      noValidate
+      className="grid gap-4"
+      aria-describedby="consultar-prov-estado"
+    >
+      <Message state={state} id="consultar-prov-estado" />
+      <FormField
+        id="consultar-prov-id"
+        name="provisioningId"
+        autoComplete="off"
+        label={text.id}
+        required
+        maxLength={15}
+        defaultValue={valuesOf(state).provisioningId}
+        error={errors.provisioningId}
+      />
+      <div>
+        <Submit
+          label={text.submit}
+          pendingLabel={text.sending}
+          pending={pending}
+          variant="outline"
+        />
+      </div>
+    </form>
+  );
+}
+
+/** Correcção F2: exige confirmação explícita; a base valida a elegibilidade. */
+export function MisclassifiedRemovalForm({
+  text,
+}: {
+  text: {
+    userId: string;
+    provisioningId: string;
+    confirm: string;
+    submit: string;
+    sending: string;
+  };
+}) {
+  const [state, action, pending] = useActionState(removeMisclassifiedAction, PORTAL_IDLE);
+  const errors = errorsOf(state);
+  const sent = valuesOf(state);
+  return (
+    <form action={action} noValidate className="grid gap-4" aria-describedby="f2-estado">
+      <Message state={state} id="f2-estado" />
+      <FormField
+        id="f2-utilizador"
+        name="userId"
+        autoComplete="off"
+        label={text.userId}
+        required
+        maxLength={36}
+        defaultValue={sent.userId}
+        error={errors.userId}
+      />
+      <FormField
+        id="f2-provisionamento"
+        name="provisioningId"
+        autoComplete="off"
+        label={text.provisioningId}
+        required
+        maxLength={15}
+        defaultValue={sent.provisioningId}
+        error={errors.provisioningId}
+      />
+      <div className="grid gap-1">
+        <label className="flex items-start gap-2 text-sm">
+          <input
+            id="f2-confirmar"
+            type="checkbox"
+            name="confirm"
+            value="sim"
+            aria-invalid={errors.confirm ? true : undefined}
+            aria-describedby={errors.confirm ? "f2-confirmar-erro" : undefined}
+          />
+          {text.confirm}
+        </label>
+        {errors.confirm && (
+          <p id="f2-confirmar-erro" className="text-danger text-sm">
+            {errors.confirm}
+          </p>
+        )}
+      </div>
+      <div>
+        <Submit label={text.submit} pendingLabel={text.sending} pending={pending} />
       </div>
     </form>
   );

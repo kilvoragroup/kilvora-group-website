@@ -19,7 +19,9 @@ import {
   CancelProvisioningForm,
   GrantRoleForm,
   HiddenActionForm,
+  MisclassifiedRemovalForm,
   ProvisionForm,
+  ProvisioningLookupForm,
 } from "../_components/admin-forms";
 import { ConsoleShell } from "../_components/console-shell";
 
@@ -64,6 +66,7 @@ function ProfileRows({
               <p className="font-semibold">
                 {profile.name ?? t(a.unnamed)} {self && t(a.you)}
               </p>
+              <p className="text-muted-foreground font-mono text-xs">{profile.id}</p>
               <p className="text-muted-foreground text-sm">
                 {t(a.status)}: {t(a.statusLabels[profile.status])}
                 {staff && (
@@ -160,6 +163,34 @@ async function Admin() {
         <ProvisionForm text={{ email: t(a.email), submit: t(a.provision), sending }} />
         <h3 className="mt-2 font-semibold">{t(a.cancelTitle)}</h3>
         <CancelProvisioningForm text={{ id: t(a.provisioningId), submit: t(a.cancel), sending }} />
+        <h3 className="mt-2 font-semibold">{t(a.f2LookupTitle)}</h3>
+        <ProvisioningLookupForm
+          text={{ id: t(a.provisioningId), submit: t(a.f2Lookup), sending }}
+        />
+      </section>
+
+      <section
+        aria-labelledby="admin-f2"
+        className="border-danger bg-danger/5 grid gap-4 rounded-xl border p-6"
+      >
+        <h2 id="admin-f2" className="text-lg font-semibold">
+          {t(a.f2Title)}
+        </h2>
+        <ol className="grid gap-1 text-sm">
+          {a.f2Steps.map((step) => (
+            <li key={step["pt-AO"]}>{t(step)}</li>
+          ))}
+        </ol>
+        <p className="text-muted-foreground text-sm">{t(a.f2Limits)}</p>
+        <MisclassifiedRemovalForm
+          text={{
+            userId: t(a.f2UserId),
+            provisioningId: t(a.provisioningId),
+            confirm: t(a.f2Confirm),
+            submit: t(a.f2Submit),
+            sending,
+          }}
+        />
       </section>
 
       <section aria-labelledby="admin-clientes" className="grid gap-4">

@@ -106,8 +106,11 @@ select tables_are('public', array[
 select tables_are('private',
   case when to_regclass('private.system_bootstrap') is null
        then array['audit_log', 'ticket_transitions', 'staff_provisioning']
-       else array['audit_log', 'ticket_transitions', 'staff_provisioning', 'system_bootstrap'] end,
-  'S1: private contém exactamente as 3 tabelas da M1 (e system_bootstrap, se a M2 estiver aplicada)');
+       when to_regclass('private.auth_invite_facts') is null
+       then array['audit_log', 'ticket_transitions', 'staff_provisioning', 'system_bootstrap']
+       else array['audit_log', 'ticket_transitions', 'staff_provisioning', 'system_bootstrap',
+                  'auth_invite_facts'] end,
+  'S1: private contém exactamente as 3 tabelas da M1 (e system_bootstrap com a M2; auth_invite_facts com a M4)');
 
 select is(
   (select count(*)::int from pg_class c join pg_namespace n on n.oid = c.relnamespace

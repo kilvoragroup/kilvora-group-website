@@ -9,6 +9,8 @@ const admin = vi.hoisted(() => ({
   setProfileStatus: vi.fn(),
   provisionStaff: vi.fn(),
   cancelProvisioning: vi.fn(),
+  getProvisioningStatus: vi.fn(),
+  removeMisclassifiedRegistration: vi.fn(),
 }));
 vi.mock("@/services/portal/admin", () => admin);
 
@@ -30,6 +32,8 @@ import {
   assignAction,
   cancelProvisioningAction,
   provisionAction,
+  provisioningStatusAction,
+  removeMisclassifiedAction,
   reopenAction,
   roleAction,
   statusAction,
@@ -43,6 +47,8 @@ const ACTIONS = [
   [statusAction, admin.setProfileStatus],
   [provisionAction, admin.provisionStaff],
   [cancelProvisioningAction, admin.cancelProvisioning],
+  [provisioningStatusAction, admin.getProvisioningStatus],
+  [removeMisclassifiedAction, admin.removeMisclassifiedRegistration],
 ] as const;
 
 const decision = (allowed: boolean, reason?: string) => ({

@@ -5,6 +5,7 @@ import {
   type RoleChange,
   parseAssignment,
   parseCancelProvisioning,
+  parseMisclassifiedRemoval,
   parseProvision,
   parseReopen,
   parseRoleChange,
@@ -183,6 +184,67 @@ export async function cancelProvisioning(raw: unknown): Promise<Outcome<true>> {
     p_provisioning_id: parsed.value.provisioningId,
   });
   return finish(result, accepted);
+}
+
+// ---------------------------------------------------------------------------------------------
+// Mitigação F2 (M4-BD)
+// ---------------------------------------------------------------------------------------------
+
+export type ProvisioningStatus = {
+  readonly id: number;
+  readonly state: "pendente" | "consumido" | "cancelado" | "expirado";
+  readonly emailMasked: string;
+  readonly createdAt: string;
+  readonly expiresAt: string;
+  readonly consumedUserId: string | null;
+  readonly provisionedByMe: boolean;
+};
+
+const PROVISIONING_STATES = ["pendente", "consumido", "cancelado", "expirado"] as const;
+
+/** Estado de um provisionamento por número (`admin_staff_provisioning_status`; fecha L2). */
+export async function getProvisioningStatus(raw: unknown): Promise<Outcome<ProvisioningStatus>> {
+  const parsed = parseCancelProvisioning(raw);
+  if (!parsed.ok) return invalid(parsed.issues);
+  const client = await openClient();
+  if (!client) return fail(UNAVAILABLE);
+  const { data, error } = await client.rpc("admin_staff_provisioning_status", {
+    p_provisioning_id: parsed.value.provisioningId,
+  });
+  if (error) return fail(error);
+  const row = (data ?? [])[0];
+  const state = PROVISIONING_STATES.find((value) => value === row?.state);
+  if (!row || !state) return fail(null);
+  return ok({
+    id: row.id,
+    state,
+    emailMasked: row.email_masked,
+    createdAt: row.created_at,
+    expiresAt: row.expires_at,
+    consumedUserId: row.consumed_user_id,
+    provisionedByMe: row.provisioned_by_me,
+  });
+}
+
+/**
+ * Correcção de um registo mal classificado (F2): remove perfil cliente, conta pessoal e
+ * associação, pela RPC da M4-BD (guardas e auditoria na base). Depois: apagar o utilizador do
+ * Auth no Dashboard (D01) e voltar a provisionar.
+ */
+export async function removeMisclassifiedRegistration(raw: unknown): Promise<Outcome<true>> {
+  const parsed = parseMisclassifiedRemoval(raw);
+  if (!parsed.ok) return invalid(parsed.issues);
+  const client = await openClient();
+  if (!client) return fail(UNAVAILABLE);
+  const result = await client.rpc("admin_remove_misclassified_registration", {
+    p_user_id: parsed.value.userId,
+    p_provisioning_id: parsed.value.provisioningId,
+  });
+  return finish(result, (data) =>
+    typeof data === "object" && data !== null && (data as { removed?: unknown }).removed === true
+      ? (true as const)
+      : null,
+  );
 }
 
 export type AuditEntry = {

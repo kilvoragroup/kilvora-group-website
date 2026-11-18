@@ -49,7 +49,14 @@ export type PortalErrorReason =
   | "invalid_email"
   | "already_provisioned"
   | "status_not_supported"
-  | "profile_anonymised";
+  | "profile_anonymised"
+  // Mitigação F2 (M4-BD)
+  | "not_eligible"
+  | "not_invited"
+  | "provisioning_mismatch"
+  | "has_activity"
+  | "self_action_forbidden"
+  | "concurrent_change";
 
 export type PortalError = {
   readonly kind: PortalErrorKind;
@@ -253,6 +260,48 @@ const REASONS: Readonly<
   profile_anonymised: {
     code: "PT409",
     message: v("Este perfil foi anonimizado.", "Este perfil foi anonimizado."),
+  },
+  not_eligible: {
+    code: "PT422",
+    message: v(
+      "Só um cliente SUSPENSO, registado há menos de 24 horas, pode ser corrigido.",
+      "Só um cliente SUSPENSO, registrado há menos de 24 horas, pode ser corrigido.",
+    ),
+  },
+  not_invited: {
+    code: "PT422",
+    message: v(
+      "Este registo não foi feito por convite: não é um caso F2.",
+      "Este registro não foi feito por convite: não é um caso F2.",
+    ),
+  },
+  provisioning_mismatch: {
+    code: "PT422",
+    message: v(
+      "O provisionamento indicado não corresponde (tem de ser seu, não consumido e anterior ao registo, até 7 dias).",
+      "O provisionamento informado não corresponde (deve ser seu, não consumido e anterior ao registro, até 7 dias).",
+    ),
+  },
+  has_activity: {
+    code: "PT409",
+    message: v(
+      "O registo já tem actividade ou outros membros e não pode ser removido.",
+      "O registro já tem atividade ou outros membros e não pode ser removido.",
+    ),
+  },
+  self_action_forbidden: {
+    code: "42501",
+    message: v(
+      "Não pode aplicar esta operação a si próprio.",
+      "Você não pode aplicar esta operação a si mesmo.",
+    ),
+  },
+  concurrent_change: {
+    code: "PT409",
+    message: v(
+      "O registo foi alterado entretanto. Actualize a página e tente novamente.",
+      "O registro foi alterado nesse meio-tempo. Atualize a página e tente novamente.",
+    ),
   },
 };
 

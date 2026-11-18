@@ -8,6 +8,7 @@ import {
   parseAssignment,
   parseAuditFilter,
   parseCancelProvisioning,
+  parseMisclassifiedRemoval,
   parseProvision,
   parseReopen,
   parseRoleChange,
@@ -102,5 +103,32 @@ describe("mensagens das RPCs administrativas", () => {
       "already_provisioned",
     );
     expect(mapPortalError({ code: "22023", message: "last_admin" }).reason).toBeNull();
+  });
+});
+
+describe("correcção F2 (M4-BD)", () => {
+  it("exige uuid, número de provisionamento e confirmação explícita", () => {
+    expect(
+      parseMisclassifiedRemoval({ userId: USER, provisioningId: "7", confirm: "sim" }),
+    ).toEqual({
+      ok: true,
+      value: { userId: USER, provisioningId: 7 },
+    });
+    expect(parseMisclassifiedRemoval({ userId: USER, provisioningId: "7" })).toEqual({
+      ok: false,
+      issues: { confirm: "confirm" },
+    });
+    expect(parseMisclassifiedRemoval({ userId: "x", provisioningId: "0", confirm: "sim" })).toEqual(
+      {
+        ok: false,
+        issues: { userId: "userId", provisioningId: "provisioningId" },
+      },
+    );
+  });
+
+  it("motivos da M4-BD com o SQLSTATE certo", () => {
+    expect(mapPortalError({ code: "PT422", message: "not_invited" }).reason).toBe("not_invited");
+    expect(mapPortalError({ code: "PT409", message: "has_activity" }).reason).toBe("has_activity");
+    expect(mapPortalError({ code: "PT422", message: "has_activity" }).reason).toBeNull();
   });
 });

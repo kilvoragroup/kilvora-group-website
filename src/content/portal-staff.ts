@@ -185,5 +185,50 @@ export const portalStaff = {
     actor: v("Autor", "Autor"),
     change: v("Alteração", "Alteração"),
     noEntries: v("Sem registos.", "Sem registros."),
+    // Mitigação F2 (M4-BD)
+    f2Title: v("Corrigir registo mal classificado (F2)", "Corrigir registro mal classificado (F2)"),
+    f2Steps: [
+      v(
+        "1. Suspenda o perfil do cliente criado por engano (lista de clientes acima).",
+        "1. Suspenda o perfil do cliente criado por engano (lista de clientes acima).",
+      ),
+      v(
+        "2. Indique o identificador desse utilizador e o número do SEU provisionamento original.",
+        "2. Informe o identificador desse usuário e o número do SEU provisionamento original.",
+      ),
+      v(
+        "3. Depois da correcção, bloqueie e apague o utilizador no Supabase Dashboard (Authentication → Users).",
+        "3. Depois da correção, bloqueie e apague o usuário no Supabase Dashboard (Authentication → Users).",
+      ),
+      v(
+        "4. Volte a provisionar e a convidar com o e-mail correcto (secção 4.2).",
+        "4. Volte a provisionar e a convidar com o e-mail correto (seção 4.2).",
+      ),
+    ],
+    f2Limits: v(
+      "Só funciona para registos feitos por convite, há menos de 24 horas, sem actividade. Remove perfil, conta pessoal e associação; a auditoria é preservada.",
+      "Só funciona para registros feitos por convite, há menos de 24 horas, sem atividade. Remove perfil, conta pessoal e associação; a auditoria é preservada.",
+    ),
+    f2UserId: v("Identificador do utilizador (UUID)", "Identificador do usuário (UUID)"),
+    f2Confirm: v(
+      "Confirmo que o perfil está suspenso e que a remoção é definitiva.",
+      "Confirmo que o perfil está suspenso e que a remoção é definitiva.",
+    ),
+    f2Submit: v("Remover registo mal classificado", "Remover registro mal classificado"),
+    f2Removed: v(
+      "Registo removido. Agora apague o utilizador no Supabase Dashboard e volte a provisionar.",
+      "Registro removido. Agora apague o usuário no Supabase Dashboard e volte a provisionar.",
+    ),
+    f2LookupTitle: v("Consultar provisionamento", "Consultar provisionamento"),
+    f2Lookup: v("Consultar", "Consultar"),
+    f2States: {
+      pendente: v("pendente", "pendente"),
+      consumido: v("consumido", "consumido"),
+      cancelado: v("cancelado", "cancelado"),
+      expirado: v("expirado", "expirado"),
+    },
+    f2Mine: v("provisionado por si", "provisionado por você"),
+    f2NotMine: v("provisionado por outro admin", "provisionado por outro admin"),
+    f2ConsumedBy: v("consumido por", "consumido por"),
   },
 } as const;

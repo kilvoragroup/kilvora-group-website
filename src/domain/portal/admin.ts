@@ -97,6 +97,29 @@ export function parseCancelProvisioning(raw: unknown): Parsed<{ provisioningId: 
   return { ok: true, value: { provisioningId: id } };
 }
 
+/**
+ * Correcção F2 (M4-BD): utilizador (uuid), provisionamento (id) e confirmação explícita.
+ * A base decide a elegibilidade (suspenso, < 24 h, convite, provisionamento, sem actividade).
+ */
+export function parseMisclassifiedRemoval(
+  raw: unknown,
+): Parsed<{ userId: string; provisioningId: number }> {
+  const input = form(raw);
+  const issues: FieldIssues = {};
+  const userId = uuidSchema.safeParse(pgBtrim(str(input.userId)));
+  if (!userId.success) issues.userId = "userId";
+  const provisioning = parseCancelProvisioning({ provisioningId: input.provisioningId });
+  if (!provisioning.ok) issues.provisioningId = "provisioningId";
+  if (input.confirm !== "sim") issues.confirm = "confirm";
+  if (!userId.success || !provisioning.ok || Object.keys(issues).length > 0) {
+    return { ok: false, issues };
+  }
+  return {
+    ok: true,
+    value: { userId: userId.data, provisioningId: provisioning.value.provisioningId },
+  };
+}
+
 /** Tipos de entidade gravados por `private.write_audit` na M2 (filtro da auditoria). */
 export const AUDIT_ENTITY_TYPES = ["ticket", "user_role", "profile", "staff_provisioning"] as const;
 
