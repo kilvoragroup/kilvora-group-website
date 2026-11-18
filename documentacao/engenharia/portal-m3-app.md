@@ -409,7 +409,7 @@ Todas as acções: interruptor → DAL `checkStaffAccess(["admin"])` (operador �
 
 **F2 (secção 4.7):** a A5 inclui o provisionamento de pessoal. A integração e qualquer provisionamento real exigem a decisão do proprietário: aceitação escrita do risco F2 ou aprovação da M4-BD (secção 4.6).
 
-### 9.8 A6 — Endurecimento (implementado localmente) e GraphQL (pendente de autorização)
+### 9.8 A6 — Endurecimento (implementado localmente) e GraphQL (G1–G8 aprovados localmente)
 
 **Endurecimento:** cabeçalhos em todas as rotas, por `next.config.ts` `headers()` e `src/config/security-headers.ts` (função pura e testada).
 
@@ -417,4 +417,21 @@ Todas as acções: interruptor → DAL `checkStaffAccess(["admin"])` (operador �
 - **Outros cabeçalhos:** `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy` restritiva e `Cross-Origin-Opener-Policy: same-origin`. O HSTS continua a ser enviado pela Vercel.
 - **Verificação local** (build com o portal activo numa instância Supabase isolada): 19 páginas, institucionais e do portal, sem violações de CSP, sem erros de página e com hidratação activa; a Server Action de entrada funciona com `form-action 'self'`.
 
-**GraphQL (G1–G8):** o `pg_graphql` **não está instalado**, nem localmente nem na homologação (verificado em leitura; só existe o esqueleto `graphql_public.graphql`). A validação G1–G8 exige activá-lo numa instância local isolada, e isso precisa da autorização específica prevista na A6. Até lá, o portão GQL fica pendente.
+**GraphQL (G1–G8):** o `pg_graphql` **não está instalado**, nem na base local principal nem na homologação (verificado em leitura; só existe o esqueleto `graphql_public.graphql`).
+
+Com autorização específica do proprietário, foi activado (`pg_graphql` 1.6.2) **só** numa instância local isolada e descartável (`kilvora_e2e_gql`, portas 593xx, sem projecto remoto ligado), com as migrações M1–M4 do repositório e dados exclusivamente sintéticos: 2 clientes (AO e BR), 2 operadores, 1 admin, 2 pedidos, 1 nota interna e 1 evidência. As consultas passaram pela entrada pública `graphql_public.graphql` (a mesma de `/graphql/v1`) com o papel e as claims de cada actor, mais uma chamada HTTP anónima a `/graphql/v1`.
+
+**Resultado: 108 verificações, 108 PASS, 0 FAIL.** Cada passagem negativa foi confirmada por controlos positivos (o admin vê a nota; o titular altera a própria conta e o próprio perfil).
+
+| Teste | Verificações | Resultado                                                                                  |
+| ----- | -----------: | ------------------------------------------------------------------------------------------ |
+| G1    |           18 | PASS: `anon` e `service_role` sem nenhuma coleção; introspecção e HTTP anónimo sem tabelas |
+| G2    |            9 | PASS: isolamento AO/BR por coleção, filtro, relações e `nodeId` global                     |
+| G3    |            6 | PASS: o operador só vê pedidos atribuídos e perde-os, com as notas, na reatribuição        |
+| G4    |           12 | PASS: staff com `aal1` sem dados internos (só o próprio papel)                             |
+| G5    |            6 | PASS: `evidence_ref` ausente do tipo, consulta explícita recusada, valor nunca devolvido   |
+| G6    |            5 | PASS: notas internas inacessíveis ao cliente, também por relações                          |
+| G7    |           36 | PASS: sem insert ou delete; update só nas colunas permitidas e só nas próprias linhas      |
+| G8    |           16 | PASS: sem `private.*`, sem `audit_log` e sem RPC expostas como campos de consulta          |
+
+O portão GQL fica aprovado localmente. A verificação de que a GraphQL remota se comporta da mesma forma continua prevista para a A7 (secção 7) e exige autorização própria. O `pg_graphql` **não** foi activado em nenhum ambiente alojado.
